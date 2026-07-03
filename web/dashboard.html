@@ -526,7 +526,7 @@
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + NINJA_KEY
+                            'X-API-Key': NINJA_KEY
                         },
                         body: JSON.stringify({
                             text: desc,
@@ -535,30 +535,30 @@
                     });
                     if (aiResp.ok) {
                         const aiData = await aiResp.json();
-                        category = aiData.categoria || 'Outros';
+                        category = aiData.categoria || null;
                         if (!valorDetectado && aiData.valor) {
                             valorDetectado = parseFloat(aiData.valor);
                         }
-                        status.textContent = `✅ IA classificou como: ${category}`;
+                        status.textContent = '🤖 Classificado por IA';
                     }
                 } catch (e) {
-                    console.log('9Router fallback');
+                    console.log('9Router indisponível, fallback local');
                 }
 
-                // Simple LLM-style classification if 9Router failed
+                // Fallback local se IA não responder
                 if (!category) {
-                    const descLower = desc.toLowerCase();
-                    if (descLower.includes('mercad') || descLower.includes('feira') || descLower.includes('compr'))
+                    const d = desc.toLowerCase();
+                    if (d.includes('mercad') || d.includes('feira') || d.includes('compr') || d.includes('pão') || d.includes('leite') || d.includes('ifood') || d.includes('lanch'))
                         category = 'Alimentação';
-                    else if (descLower.includes('uber') || descLower.includes('transp') || descLower.includes('gas'))
+                    else if (d.includes('uber') || d.includes('transp') || d.includes('gas') || d.includes('onibus') || d.includes('passagem'))
                         category = 'Transporte';
-                    else if (descLower.includes('alug') || descLower.includes('cond'))
+                    else if (d.includes('alug') || d.includes('cond') || d.includes('agua') || d.includes('luz') || d.includes('conta'))
                         category = 'Moradia';
-                    else if (descLower.includes('salário') || descLower.includes('freela') || descLower.includes('pix receb'))
+                    else if (d.includes('salario') || d.includes('freela') || d.includes('pix receb') || d.includes('pagamento receb'))
                         category = 'Renda';
                     else
                         category = 'Outros';
-                    status.textContent = `🔍 Categoria estimada: ${category}`;
+                    status.textContent = '🔍 Categoria: ' + category;
                 }
 
                 if (!valorDetectado) {
