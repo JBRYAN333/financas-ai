@@ -336,6 +336,9 @@
         });
 
         async function loadData() {
+            // Fetch latest exchange rates
+            await fetchRates();
+
             // Load user settings first
             try {
                 const userDoc = await db.collection('users').doc(currentUser.uid).get();
@@ -363,13 +366,34 @@
         }
 
         let userCurrency = "BRL";
-        function formatValue(v) {
-            const cur = userCurrency || 'BRL';
-            const vNum = parseFloat(v || 0);
+        let rates = { BRL: 1, USD: 1, EUR: 1 };
+
+        // Fetch latest rates
+        async function fetchRates() {
             try {
-                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(vNum);
+                const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                const data = await res.json();
+                rates = data.rates || {};
+                rates.USD = 1;
+            } catch(e) { console.log('Rates fetch failed'); }
+        }
+
+        // Convert value from currency A to B using BRL as base
+        function convert(value, from, to) {
+            if (!value || from === to) return value;
+            const inUsd = value / (rates[from] || 1);
+            return inUsd * (rates[to] || 1);
+        }
+
+        function formatValue(v, currency) {
+            const cur = userCurrency || 'BRL';
+            const fromCur = currency || cur;
+            const vNum = parseFloat(v || 0);
+            const displayValue = convert(vNum, fromCur, cur);
+            try {
+                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(displayValue);
             } catch(e) {
-                return 'R$ ' + vNum.toFixed(2).replace('.', ',');
+                return cur + ' ' + displayValue.toFixed(2);
             }
         }
 
@@ -392,22 +416,33 @@
             let saldo = 0;
             let categories = {};
 
+            // Helper: converte valor pra moeda principal do usuário e soma
+            const sumConverted = (t, isEntrada) => {
+                const v = parseFloat(t.valueOriginal || t.value || 0);
+                const c = t.currency || 'BRL';
+                const converted = convert(v, c, userCurrency);
+                if (isEntrada) saldo += converted;
+                else saldo -= converted;
+            };
+
             // Calculate balance from all transactions in order
             const ordered = [...allTransactions].reverse();
             ordered.forEach(t => {
-                const v = parseFloat(t.value || 0);
-                if (t.type === 'entrada') saldo += v;
-                else saldo -= v;
+                if (t.type === 'entrada') sumConverted(t, true);
+                else sumConverted(t, false);
             });
 
             monthTx.forEach(t => {
-                const v = parseFloat(t.value || 0);
-                if (t.type === 'entrada') entradas += v;
-                else saidas += v;
+                const v = parseFloat(t.valueOriginal || t.value || 0);
+                const c = t.currency || 'BRL';
+                const converted = convert(v, c, userCurrency);
+                
+                if (t.type === 'entrada') entradas += converted;
+                else saidas += converted;
 
                 const cat = t.category || 'Outros';
                 if (t.type === 'saida') {
-                    categories[cat] = (categories[cat] || 0) + v;
+                    categories[cat] = (categories[cat] || 0) + converted;
                 }
             });
 
@@ -433,9 +468,10 @@
             const data = [];
 
             ordered.forEach(t => {
-                const v = parseFloat(t.value || 0);
-                if (t.type === 'entrada') runningBalance += v;
-                else runningBalance -= v;
+                const v = parseFloat(t.valueOriginal || t.value || 0);
+                const c = t.currency || 'BRL';
+                if (t.type === 'entrada') runningBalance += convert(v, c, userCurrency);
+                else runningBalance -= convert(v, c, userCurrency);
                 
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
                 labels.push(d.toLocaleDateString('pt-BR'));
@@ -511,12 +547,15 @@
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
                 const tr = document.createElement('tr');
                 const catLabel = t.category || '—';
+                const valueOrig = t.valueOriginal || t.value || 0;
+                const curr = t.currency || 'BRL';
+                const showOriginal = curr !== userCurrency && valueOrig;
                 tr.innerHTML = `
                     <td>${d.toLocaleDateString('pt-BR')}</td>
-                    <td>${t.description || '—'}${t.moedaOrigem && t.moedaOrigem !== userCurrency && t.valueOriginal ? ` <span style="font-size:0.7rem;color:var(--text-dim)">(${t.valueOriginal.toFixed(2)} ${t.moedaOrigem})</span>` : ''}</td>
+                    <td>${t.description || '—'}</td>
                     <td><span class="category-badge">${catLabel}</span></td>
                     <td class="${t.type === 'entrada' ? 'positive' : 'negative'}">
-                        ${t.type === 'entrada' ? '+' : '-'} ${formatValue(t.value)}
+                        ${t.type === 'entrada' ? '+' : '-'} ${formatValue(valueOrig, curr)}${showOriginal ? ` <span style="font-size:0.65rem;color:var(--text-dim)">(${parseFloat(valueOrig).toFixed(2)} ${curr})</span>` : ''}
                     </td>
                     <td><button class="delete-btn" onclick="deleteTransaction('${t.id}')">✕</button></td>
                 `;
@@ -596,35 +635,14 @@
                     valorDetectado = match ? parseFloat(match[1].replace(',','.')) : 0;
                 }
 
-                // Moeda da transação
+                // Moeda da transação — salva ORIGINAL, converte só na exibição
                 const moedaOrigem = document.getElementById('moedaSelect').value;
-
-                // Se a moeda for diferente da principal, converte
-                let valorConvertido = valorDetectado || 0;
-                let taxaCambio = 1;
-
-                if (moedaOrigem !== userCurrency && valorDetectado) {
-                    status.textContent = '🔄 Convertendo moeda...';
-                    try {
-                        const res = await fetch('https://api.exchangerate-api.com/v4/latest/' + moedaOrigem);
-                        if (res.ok) {
-                            const data = await res.json();
-                            taxaCambio = data.rates[userCurrency] || 1;
-                            valorConvertido = valorDetectado * taxaCambio;
-                        }
-                    } catch (e) {
-                        console.log('Falha ao converter moeda, mantendo original');
-                    }
-                }
 
                 const transaction = {
                     date: new Date(),
                     description: desc,
-                    value: valorConvertido,
-                    valueOriginal: valorDetectado,
-                    moedaOrigem: moedaOrigem,
-                    moedaPrincipal: userCurrency,
-                    taxaCambio: taxaCambio,
+                    valueOriginal: valorDetectado || 0,
+                    currency: moedaOrigem,
                     type: tipo,
                     category: category,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -635,8 +653,8 @@
 
                 document.getElementById('descInput').value = '';
                 document.getElementById('valorInput').value = '';
-                status.textContent = '✅ Transação adicionada! (conversão: ' + moedaOrigem + ' → ' + userCurrency + ')';
-                setTimeout(() => { status.textContent = ''; }, 4000);
+                status.textContent = '✅ Adicionado! (' + moedaOrigem + ')';
+                setTimeout(() => { status.textContent = ''; }, 3000);
                 await loadData();
 
             } catch (err) {
