@@ -513,7 +513,7 @@
                 const catLabel = t.category || '—';
                 tr.innerHTML = `
                     <td>${d.toLocaleDateString('pt-BR')}</td>
-                    <td>${t.description || '—'}</td>
+                    <td>${t.description || '—'}${t.moedaOrigem && t.moedaOrigem !== userCurrency && t.valueOriginal ? ` <span style="font-size:0.7rem;color:var(--text-dim)">(${t.valueOriginal.toFixed(2)} ${t.moedaOrigem})</span>` : ''}</td>
                     <td><span class="category-badge">${catLabel}</span></td>
                     <td class="${t.type === 'entrada' ? 'positive' : 'negative'}">
                         ${t.type === 'entrada' ? '+' : '-'} ${formatValue(t.value)}
@@ -596,10 +596,35 @@
                     valorDetectado = match ? parseFloat(match[1].replace(',','.')) : 0;
                 }
 
+                // Moeda da transação
+                const moedaOrigem = document.getElementById('moedaSelect').value;
+
+                // Se a moeda for diferente da principal, converte
+                let valorConvertido = valorDetectado || 0;
+                let taxaCambio = 1;
+
+                if (moedaOrigem !== userCurrency && valorDetectado) {
+                    status.textContent = '🔄 Convertendo moeda...';
+                    try {
+                        const res = await fetch('https://api.exchangerate-api.com/v4/latest/' + moedaOrigem);
+                        if (res.ok) {
+                            const data = await res.json();
+                            taxaCambio = data.rates[userCurrency] || 1;
+                            valorConvertido = valorDetectado * taxaCambio;
+                        }
+                    } catch (e) {
+                        console.log('Falha ao converter moeda, mantendo original');
+                    }
+                }
+
                 const transaction = {
                     date: new Date(),
                     description: desc,
-                    value: valorDetectado || 0,
+                    value: valorConvertido,
+                    valueOriginal: valorDetectado,
+                    moedaOrigem: moedaOrigem,
+                    moedaPrincipal: userCurrency,
+                    taxaCambio: taxaCambio,
                     type: tipo,
                     category: category,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -610,8 +635,8 @@
 
                 document.getElementById('descInput').value = '';
                 document.getElementById('valorInput').value = '';
-                status.textContent = '✅ Transação adicionada!';
-                setTimeout(() => { status.textContent = ''; }, 3000);
+                status.textContent = '✅ Transação adicionada! (conversão: ' + moedaOrigem + ' → ' + userCurrency + ')';
+                setTimeout(() => { status.textContent = ''; }, 4000);
                 await loadData();
 
             } catch (err) {
