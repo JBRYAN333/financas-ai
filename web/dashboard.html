@@ -336,6 +336,14 @@
         });
 
         async function loadData() {
+            // Load user settings first
+            try {
+                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+                if (userDoc.exists && userDoc.data().currency) {
+                    userCurrency = userDoc.data().currency;
+                }
+            } catch(e) { console.log('Currency load:', e); }
+
             const snapshot = await db.collection('users').doc(currentUser.uid)
                 .collection('transactions')
                 .orderBy('createdAt', 'desc')
