@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financas AI — Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --green: #22c55e;
+            --green-dark: #16a34a;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        /* Layout */
+        .app { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 240px;
+            background: var(--card);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+        }
+        .sidebar h2 span { color: var(--green); }
+        .sidebar a {
+            color: var(--text-dim);
+            text-decoration: none;
+            padding: 0.7rem 1rem;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        .sidebar a:hover, .sidebar a.active { 
+            background: rgba(34,197,94,0.1); 
+            color: var(--text);
+        }
+        .sidebar a.active { border-left: 3px solid var(--green); }
+        .sidebar .user-info {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .sidebar .user-info .email { color: var(--text-dim); }
+        .sidebar .logout-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--red);
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .sidebar .logout-btn:hover { background: rgba(239,68,68,0.1); }
+
+        .main {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .main h1 { margin-bottom: 0.5rem; }
+        .main .subtitle { color: var(--text-dim); margin-bottom: 2rem; }
+
+        /* Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+        }
+        .stat-card .label { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.3rem; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+        .stat-card .value.positive { color: var(--green); }
+        .stat-card .value.negative { color: var(--red); }
+        .stat-card .sub { font-size: 0.75rem; color: var(--text-dim); }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+        }
+        .chart-card h3 { margin-bottom: 1rem; font-size: 0.95rem; }
+        .chart-card canvas { max-height: 300px; }
+
+        /* Add transaction */
+        .add-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        .add-card h3 { margin-bottom: 1rem; }
+        .add-form {
+            display: flex;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+        }
+        .add-form input, .add-form select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.7rem 1rem;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 200px;
+        }
+        .add-form input:focus, .add-form select:focus {
+            outline: none;
+            border-color: var(--green);
+        }
+        .add-form button {
+            background: var(--green);
+            color: #052e16;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: 0.15s;
+        }
+        .add-form button:hover { background: var(--green-dark); }
+
+        /* Transactions table */
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+        }
+        .table-card h3 { margin-bottom: 1rem; display: flex; justify-content: space-between; }
+        .table-card h3 span { color: var(--text-dim); font-weight: 400; font-size: 0.85rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { text-align: left; padding: 0.5rem; color: var(--text-dim); font-weight: 500; border-bottom: 1px solid var(--border); }
+        td { padding: 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); }
+        td.positive { color: var(--green); }
+        td.negative { color: var(--red); }
+        .category-badge {
+            background: rgba(59,130,246,0.1);
+            color: var(--blue);
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+        }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--red);
+            cursor: pointer;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+        .delete-btn:hover { opacity: 1; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 3rem; color: var(--text-dim); }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; padding: 1rem 0.5rem; }
+            .sidebar a span, .sidebar h2, .sidebar .user-info { display: none; }
+            .main { padding: 1rem; }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <h2>💰 <span>F</span>AI</h2>
+            <a href="#" class="active">📊 <span>Dashboard</span></a>
+            <a href="#" onclick="showAddForm()">➕ <span>Nova transação</span></a>
+            <a href="https://t.me/YourBot" target="_blank">📱 <span>Telegram</span></a>
+            <a href="index.html">🏠 <span>Início</span></a>
+            <div class="user-info">
+                <div style="color:var(--text);font-weight:500" id="userName">—</div>
+                <div class="email" id="userEmail">—</div>
+                <button class="logout-btn" onclick="handleLogout()">🚪 Sair</button>
+            </div>
+        </div>
+        <div class="main">
+            <h1>📊 Dashboard</h1>
+            <p class="subtitle" id="monthLabel">Carregando...</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">Saldo atual</div>
+                    <div class="value" id="saldo">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Entradas (mês)</div>
+                    <div class="value positive" id="entradas">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Saídas (mês)</div>
+                    <div class="value negative" id="saidas">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total de transações</div>
+                    <div class="value" id="totalTransacoes">—</div>
+                    <div class="sub" id="monthTransacoes">este mês</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>📈 Saldo ao longo do tempo</h3>
+                    <canvas id="chartLinha"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>🥧 Gastos por categoria</h3>
+                    <canvas id="chartPizza"></canvas>
+                </div>
+            </div>
+
+            <div class="add-card">
+                <h3>➕ Nova transação</h3>
+                <form class="add-form" id="addForm">
+                    <input type="text" id="descInput" placeholder='Ex: "Comprei pão no mercado R$ 35,90"' required>
+                    <select id="tipoSelect">
+                        <option value="saida">💸 Saída</option>
+                        <option value="entrada">💰 Entrada</option>
+                    </select>
+                    <input type="number" id="valorInput" step="0.01" placeholder="Valor (deixe vazio pra IA detectar)">
+                    <button type="submit">Adicionar</button>
+                </form>
+                <div id="aiStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+            </div>
+
+            <div class="table-card">
+                <h3>📋 Últimas transações <span id="transCount"></span></h3>
+                <div id="transactionsLoading" class="loading">⏳ Carregando...</div>
+                <div id="transactionsTableContainer" style="display:none">
+                    <table>
+                        <thead><tr>
+                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th>
+                        </tr></thead>
+                        <tbody id="transactionsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const NINJA_API = 'https://protagrouter.squareweb.app';
+        const NINJA_KEY = 'clawsec_ninja_2026';
+
+        let currentUser = null;
+        let allTransactions = [];
+        let chartLinha = null;
+        let chartPizza = null;
+
+        // Auth state
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('userName').textContent = user.displayName || 'Usuário';
+                document.getElementById('userEmail').textContent = user.email;
+                await loadData();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        async function loadData() {
+            const snapshot = await db.collection('users').doc(currentUser.uid)
+                .collection('transactions')
+                .orderBy('createdAt', 'desc')
+                .limit(100)
+                .get();
+
+            allTransactions = [];
+            snapshot.forEach(doc => {
+                allTransactions.push({ id: doc.id, ...doc.data() });
+            });
+
+            document.getElementById('transactionsLoading').style.display = 'none';
+            document.getElementById('transactionsTableContainer').style.display = 'block';
+
+            updateDashboard();
+            updateTable();
+        }
+
+        function formatValue(v) {
+            return 'R$ ' + parseFloat(v || 0).toFixed(2).replace('.', ',');
+        }
+
+        function updateDashboard() {
+            const now = new Date();
+            const month = now.getMonth();
+            const year = now.getFullYear();
+            
+            const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            document.getElementById('monthLabel').textContent = `Visão geral de ${monthNames[month]}/${year}`;
+
+            const monthTx = allTransactions.filter(t => {
+                if (!t.date) return false;
+                const d = t.date.toDate ? t.date.toDate() : new Date(t.date);
+                return d.getMonth() === month && d.getFullYear() === year;
+            });
+
+            let entradas = 0, saidas = 0;
+            let saldo = 0;
+            let categories = {};
+
+            // Calculate balance from all transactions in order
+            const ordered = [...allTransactions].reverse();
+            ordered.forEach(t => {
+                const v = parseFloat(t.value || 0);
+                if (t.type === 'entrada') saldo += v;
+                else saldo -= v;
+            });
+
+            monthTx.forEach(t => {
+                const v = parseFloat(t.value || 0);
+                if (t.type === 'entrada') entradas += v;
+                else saidas += v;
+
+                const cat = t.category || 'Outros';
+                if (t.type === 'saida') {
+                    categories[cat] = (categories[cat] || 0) + v;
+                }
+            });
+
+            document.getElementById('saldo').textContent = formatValue(saldo);
+            document.getElementById('saldo').className = 'value ' + (saldo >= 0 ? 'positive' : 'negative');
+            document.getElementById('entradas').textContent = formatValue(entradas);
+            document.getElementById('saidas').textContent = formatValue(saidas);
+            document.getElementById('totalTransacoes').textContent = allTransactions.length;
+            document.getElementById('monthTransacoes').textContent = monthTx.length + ' este mês';
+            document.getElementById('transCount').textContent = `(${allTransactions.length})`;
+
+            // Charts
+            updateCharts(ordered, categories);
+        }
+
+        function updateCharts(ordered, categories) {
+            // Line chart - balance over time
+            const ctxL = document.getElementById('chartLinha').getContext('2d');
+            if (chartLinha) chartLinha.destroy();
+
+            let runningBalance = 0;
+            const labels = [];
+            const data = [];
+
+            ordered.forEach(t => {
+                const v = parseFloat(t.value || 0);
+                if (t.type === 'entrada') runningBalance += v;
+                else runningBalance -= v;
+                
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
+                labels.push(d.toLocaleDateString('pt-BR'));
+                data.push(runningBalance);
+            });
+
+            chartLinha = new Chart(ctxL, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Saldo',
+                        data,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34,197,94,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#94a3b8', maxTicksLimit: 8 },
+                            grid: { color: 'rgba(51,65,85,0.3)' }
+                        },
+                        y: { 
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(51,65,85,0.3)' }
+                        }
+                    }
+                }
+            });
+
+            // Pizza chart
+            const ctxP = document.getElementById('chartPizza').getContext('2d');
+            if (chartPizza) chartPizza.destroy();
+
+            const catEntries = Object.entries(categories).sort((a,b) => b[1] - a[1]);
+            const colors = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
+
+            chartPizza = new Chart(ctxP, {
+                type: 'doughnut',
+                data: {
+                    labels: catEntries.map(c => c[0]),
+                    datasets: [{
+                        data: catEntries.map(c => c[1]),
+                        backgroundColor: colors.slice(0, catEntries.length),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('transactionsBody');
+            tbody.innerHTML = '';
+
+            allTransactions.slice(0, 30).forEach(t => {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
+                const tr = document.createElement('tr');
+                const catLabel = t.category || '—';
+                tr.innerHTML = `
+                    <td>${d.toLocaleDateString('pt-BR')}</td>
+                    <td>${t.description || '—'}</td>
+                    <td><span class="category-badge">${catLabel}</span></td>
+                    <td class="${t.type === 'entrada' ? 'positive' : 'negative'}">
+                        ${t.type === 'entrada' ? '+' : '-'} ${formatValue(t.value)}
+                    </td>
+                    <td><button class="delete-btn" onclick="deleteTransaction('${t.id}')">✕</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function deleteTransaction(id) {
+            if (!confirm('Excluir esta transação?')) return;
+            await db.collection('users').doc(currentUser.uid)
+                .collection('transactions').doc(id).delete();
+            await loadData();
+        }
+
+        // Add transaction form
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const desc = document.getElementById('descInput').value.trim();
+            const tipo = document.getElementById('tipoSelect').value;
+            const valor = document.getElementById('valorInput').value;
+            const status = document.getElementById('aiStatus');
+
+            if (!desc) return;
+
+            status.textContent = '🤔 Classificando com IA...';
+
+            try {
+                let category = null;
+                let valorDetectado = valor ? parseFloat(valor) : null;
+
+                // Try 9Router AI classification
+                try {
+                    const aiResp = await fetch(NINJA_API + '/api/classify', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + NINJA_KEY
+                        },
+                        body: JSON.stringify({
+                            text: desc,
+                            model: 'protagnix'
+                        })
+                    });
+                    if (aiResp.ok) {
+                        const aiData = await aiResp.json();
+                        category = aiData.categoria || 'Outros';
+                        if (!valorDetectado && aiData.valor) {
+                            valorDetectado = parseFloat(aiData.valor);
+                        }
+                        status.textContent = `✅ IA classificou como: ${category}`;
+                    }
+                } catch (e) {
+                    console.log('9Router fallback');
+                }
+
+                // Simple LLM-style classification if 9Router failed
+                if (!category) {
+                    const descLower = desc.toLowerCase();
+                    if (descLower.includes('mercad') || descLower.includes('feira') || descLower.includes('compr'))
+                        category = 'Alimentação';
+                    else if (descLower.includes('uber') || descLower.includes('transp') || descLower.includes('gas'))
+                        category = 'Transporte';
+                    else if (descLower.includes('alug') || descLower.includes('cond'))
+                        category = 'Moradia';
+                    else if (descLower.includes('salário') || descLower.includes('freela') || descLower.includes('pix receb'))
+                        category = 'Renda';
+                    else
+                        category = 'Outros';
+                    status.textContent = `🔍 Categoria estimada: ${category}`;
+                }
+
+                if (!valorDetectado) {
+                    const match = desc.match(/(\d+[.,]\d+)/);
+                    valorDetectado = match ? parseFloat(match[1].replace(',','.')) : 0;
+                }
+
+                const transaction = {
+                    date: new Date(),
+                    description: desc,
+                    value: valorDetectado || 0,
+                    type: tipo,
+                    category: category,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection('users').doc(currentUser.uid)
+                    .collection('transactions').add(transaction);
+
+                document.getElementById('descInput').value = '';
+                document.getElementById('valorInput').value = '';
+                status.textContent = '✅ Transação adicionada!';
+                setTimeout(() => { status.textContent = ''; }, 3000);
+                await loadData();
+
+            } catch (err) {
+                status.textContent = '❌ Erro: ' + err.message;
+            }
+        });
+
+        function showAddForm() {
+            document.getElementById('descInput').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('descInput').focus();
+        }
+
+        function handleLogout() {
+            auth.signOut();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

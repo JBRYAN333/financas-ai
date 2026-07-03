@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financas AI — Suas finanças sem complicação</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+    <style>
+        :root {
+            --green: #22c55e;
+            --green-dark: #16a34a;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --card-hover: #334155;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(34,197,94,0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.2);
+            border-radius: 999px;
+            padding: 0.4rem 1rem;
+            font-size: 0.8rem;
+            color: var(--green);
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+        .hero h1 {
+            font-size: clamp(2.5rem, 7vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        .hero h1 span { 
+            background: linear-gradient(135deg, var(--green), #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero p {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: var(--text-dim);
+            max-width: 600px;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+        .hero-actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            position: relative;
+        }
+        .btn {
+            padding: 0.9rem 2.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-primary {
+            background: var(--green);
+            color: #052e16;
+            box-shadow: 0 4px 20px rgba(34,197,94,0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(34,197,94,0.4);
+        }
+        .btn-secondary {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover {
+            background: var(--card-hover);
+        }
+        .btn-google {
+            background: #fff;
+            color: #1a1a1a;
+        }
+        .btn-google:hover {
+            transform: translateY(-2px);
+        }
+        .btn-google img { width: 20px; height: 20px; }
+
+        /* Features */
+        .features {
+            padding: 5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .features h2 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 3rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        .feature-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+        }
+        .feature-card:hover {
+            border-color: var(--green);
+            transform: translateY(-4px);
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        .feature-card h3 { margin-bottom: 0.5rem; font-size: 1.1rem; }
+        .feature-card p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.5; }
+
+        /* Pricing */
+        .pricing {
+            padding: 5rem 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .pricing h2 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 3rem;
+        }
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        .pricing-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+        }
+        .pricing-card.featured {
+            border-color: var(--green);
+            box-shadow: 0 0 30px rgba(34,197,94,0.1);
+        }
+        .pricing-card.featured::before {
+            content: '🔥 Melhor valor';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--green);
+            color: #052e16;
+            padding: 0.2rem 1rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .price { font-size: 2.5rem; font-weight: 800; margin: 1rem 0; }
+        .price span { font-size: 1rem; font-weight: 400; color: var(--text-dim); }
+        .pricing-card ul { list-style: none; text-align: left; margin: 1.5rem 0; }
+        .pricing-card li { 
+            padding: 0.4rem 0; 
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        .pricing-card li::before { content: '✅ '; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+        }
+        footer a { color: var(--green); text-decoration: none; }
+
+        /* Loading overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.9);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .loading-overlay.show { display: flex; }
+        .spinner {
+            width: 48px; height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 640px) {
+            .hero { padding: 1.5rem; }
+            .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p style="color:var(--text-dim)">Entrando...</p>
+    </div>
+
+    <section class="hero">
+        <div class="hero-badge">🤖 IA classifica seus gastos automaticamente</div>
+        <h1>Finanças que<br><span>entendem você</span></h1>
+        <p>
+            Chega de planilhas confusas. Descreva seu gasto em português 
+            e nossa IA classifica tudo. Grátis para começar.
+        </p>
+        <div class="hero-actions">
+            <button class="btn btn-google" onclick="handleLogin()">
+                <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+                Entrar com Google
+            </button>
+            <a href="#planos" class="btn btn-secondary">Ver planos</a>
+        </div>
+    </section>
+
+    <section class="features">
+        <h2>Como funciona</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🗣️</div>
+                <h3>Descreva em português</h3>
+                <p>"Comprei pão e leite por R$ 35,90 no mercado" — nossa IA entende e classifica.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>IA classifica tudo</h3>
+                <p>Automaticamente separa em categorias: alimentação, transporte, moradia...</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Dashboard em tempo real</h3>
+                <p>Gráficos claros de entrada vs saída, gastos por categoria, saldo atual.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Notificações no Telegram</h3>
+                <p>Receba alertas de saldo baixo, resumo semanal e metas atingidas.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Seus dados, seu controle</h3>
+                <p>Firebase com criptografia. Cada usuário vê só os próprios dados.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <h3>Grátis pra começar</h3>
+                <p>Plano Free com 50 lançamentos/mês. Upgrade só quando precisar.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="pricing" id="planos">
+        <h2>Planos</h2>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>Free</h3>
+                <div class="price">R$ 0<span>/mês</span></div>
+                <ul>
+                    <li>50 lançamentos/mês</li>
+                    <li>Classificação por IA</li>
+                    <li>Dashboard básico</li>
+                    <li>Histórico de 3 meses</li>
+                </ul>
+                <button class="btn btn-primary" onclick="handleLogin()">Começar grátis</button>
+            </div>
+            <div class="pricing-card featured">
+                <h3>Pro</h3>
+                <div class="price">R$ 19,90<span>/mês</span></div>
+                <ul>
+                    <li>Lançamentos ilimitados</li>
+                    <li>IA premium (OpenCode)</li>
+                    <li>Dashboard completo + gráficos</li>
+                    <li>Histórico ilimitado</li>
+                    <li>Exportar relatórios</li>
+                    <li>Notificações no Telegram</li>
+                </ul>
+                <button class="btn btn-primary" onclick="handleLogin()">Assinar Pro</button>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>Feito com ☕ por <a href="https://github.com/JBRYAN333" target="_blank">NixRyan</a> • 
+        <a href="#" onclick="handleLogin()">Entrar</a></p>
+    </footer>
+
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Handle login
+        function handleLogin() {
+            document.getElementById('loadingOverlay').classList.add('show');
+            
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('email');
+            
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    // Redirect to dashboard
+                    window.location.href = 'dashboard.html?uid=' + result.user.uid;
+                })
+                .catch((error) => {
+                    document.getElementById('loadingOverlay').classList.remove('show');
+                    if (error.code !== 'auth/popup-closed-by-user') {
+                        alert('Erro ao entrar: ' + error.message);
+                    }
+                });
+        }
+
+        // If already logged in, redirect
+        auth.onAuthStateChanged((user) => {
+            if (user && window.location.pathname.includes('index') === false) {
+                // Already on dashboard probably
+            }
+        });
+    </script>
+</body>
+</html>
