@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financas AI — Dashboard</title>
+    <title>FAI — Finanças Inteligentes</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
@@ -212,7 +213,13 @@
 <body>
     <div class="app">
         <div class="sidebar">
-            <h2>💰 <span>F</span>AI</h2>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.5rem">
+                <div style="background:linear-gradient(135deg,#22c55e,#06b6d4);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:#052e16">FAI</div>
+                <div>
+                    <div style="font-weight:700;font-size:1rem">Financas AI</div>
+                    <div style="font-size:0.7rem;color:var(--text-dim)">💰 inteligente</div>
+                </div>
+            </div>
             <a href="#" class="active">📊 <span>Dashboard</span></a>
             <a href="#" onclick="showAddForm()">➕ <span>Nova transação</span></a>
             <a href="https://t.me/YourBot" target="_blank">📱 <span>Telegram</span></a>
@@ -562,7 +569,10 @@
                 }
 
                 if (!valorDetectado) {
-                    const match = desc.match(/(\d+[.,]\d+)/);
+                    // Detecta valor: R$12,00, 12 reais, 12.50, 12,50, só 12
+                    let match = desc.match(/R?\$?\s?(\d+[.,]\d+)/);
+                    if (!match) match = desc.match(/(\d+)\s*(?:real|reais|r\$|conto)s?/i);
+                    if (!match) match = desc.match(/(\d+)/);
                     valorDetectado = match ? parseFloat(match[1].replace(',','.')) : 0;
                 }
 
@@ -590,7 +600,7 @@
         });
 
         function showAddForm() {
-            document.getElementById('descInput').scrollIntoView({ behavior: 'smooth' });
+            document.querySelector('.add-card').scrollIntoView({ behavior: 'smooth' });
             document.getElementById('descInput').focus();
         }
 

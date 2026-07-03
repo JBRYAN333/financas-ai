@@ -1,0 +1,46 @@
+name: Validação e Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Valida HTML
+        run: |
+          echo "🔍 Validando arquivos HTML..."
+          for f in web/*.html; do
+            if grep -q "<html" "$f"; then
+              echo "✅ $f - HTML válido"
+            else
+              echo "❌ $f - HTML inválido"
+              exit 1
+            fi
+          done
+      
+      - name: Verifica Firebase config
+        run: |
+          echo "🔍 Verificando Firebase config..."
+          for f in web/*.html; do
+            if grep -q "firebase.initializeApp" "$f"; then
+              echo "✅ Firebase config presente em $f"
+            else
+              echo "❌ Firebase config ausente em $f"
+              exit 1
+            fi
+          done
+      
+      - name: Verifica links quebrados
+        run: |
+          echo "🔍 Verificando links..."
+          if grep -r "YOUR_API_KEY\|YOUR_PROJECT" web/; then
+            echo "❌ Ainda tem placeholder de Firebase!"
+            exit 1
+          fi
+          echo "✅ Sem placeholders"
