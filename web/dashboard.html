@@ -889,6 +889,27 @@
             document.getElementById('importStatus').textContent = '';
         }
 
+        // Categorização local (sem IA)
+        function categorizeLocal(desc, tipo) {
+            if (tipo === 'entrada') return 'Renda';
+            const d = (desc || '').toLowerCase();
+            if (d.includes('mercad') || d.includes('feira') || d.includes('compr') || d.includes('pão') || d.includes('leite') || d.includes('ifood') || d.includes('lanch') || d.includes('restaur') || d.includes('pizza') || d.includes('padaria') || d.includes('supermerc') || d.includes('café') || d.includes('cafe') || d.includes('fruta') || d.includes('carne'))
+                return 'Alimentação';
+            if (d.includes('uber') || d.includes('transp') || d.includes('gas') || d.includes('gasolina') || d.includes('onibus') || d.includes('passagem') || d.includes('combust') || d.includes('pedag'))
+                return 'Transporte';
+            if (d.includes('alug') || d.includes('cond') || d.includes('agua') || d.includes('luz') || d.includes('conta') || d.includes('energia') || d.includes('internet') || d.includes('telefone'))
+                return 'Moradia';
+            if (d.includes('saúde') || d.includes('medico') || d.includes('medic') || d.includes('farmácia') || d.includes('farmacia') || d.includes('hospital') || d.includes('dentista'))
+                return 'Saúde';
+            if (d.includes('netflix') || d.includes('spotify') || d.includes('stream') || d.includes('assinatura') || d.includes('mensalidade'))
+                return 'Assinaturas';
+            if (d.includes('escola') || d.includes('curso') || d.includes('livro') || d.includes('educacao'))
+                return 'Educação';
+            if (d.includes('lazer') || d.includes('cinema') || d.includes('jogo') || d.includes('viagem'))
+                return 'Lazer';
+            return 'Outros';
+        }
+
         // Add transaction form
         document.getElementById('addForm').addEventListener('submit', async (e) => {
             e.preventDefault();
