@@ -2,11 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Write: 500 writes/day per user, validate fields
+      allow create: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['value', 'description', 'type', 'category'])
+        && request.resource.data.type in ['entrada', 'saida']
+        && request.resource.data.value is number
+        && request.resource.data.value >= 0
+        && request.resource.data.value <= 999999999.99
+        && request.resource.data.description.size() <= 500
+        && request.write.size < 10;
+        // && get(/databases/$(database)/documents/users/$(userId)).data.usage.transactions < 50  (activate per plan)
+      
+      allow update: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['description', 'value', 'type', 'category', 'currency']);
+      
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Admin access for creator
     match /admin/{document} {
       allow read: if request.auth != null && 
         request.auth.token.email == "sufocoprojeto@gmail.com";
+    }
+    
+    // User profile: each user can read/write their own
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

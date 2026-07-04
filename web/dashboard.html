@@ -272,10 +272,16 @@
                         <option value="saida">💸 Saída</option>
                         <option value="entrada">Entrada</option>
                     </select>
-                    <select id="moedaSelect" style="min-width:80px;flex:0.3">
+                    <select id="moedaSelect" style="min-width:100px;flex:0.3">
                         <option value="BRL">BRL R$</option>
                         <option value="USD">USD $</option>
                         <option value="EUR">EUR €</option>
+                        <option value="ARS">ARS $</option>
+                        <option value="UYU">UYU $</option>
+                        <option value="PYG">PYG ₲</option>
+                        <option value="PEN">PEN S/</option>
+                        <option value="GBP">GBP £</option>
+                        <option value="JPY">JPY ¥</option>
                     </select>
                     <input type="number" id="valorInput" step="0.01" placeholder="Valor (deixe vazio pra IA detectar)">
                     <button type="submit">Adicionar</button>
@@ -367,14 +373,30 @@
         let userCurrency = "BRL";
         let rates = { BRL: 1, USD: 1, EUR: 1 };
 
-        // Fetch latest rates
+        // Fetch latest rates with fallback chain + regional currencies
         async function fetchRates() {
-            try {
-                const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const data = await res.json();
-                rates = data.rates || {};
-                rates.USD = 1;
-            } catch(e) { console.log('Rates fetch failed'); }
+            const sources = [
+                'https://open.er-api.com/v6/latest/USD',
+                'https://api.exchangerate-api.com/v4/latest/USD'
+            ];
+            for (const url of sources) {
+                try {
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.rates) {
+                        rates = data.rates;
+                        rates.USD = 1;
+                        if (!rates.ARS) rates.ARS = 850;
+                        if (!rates.UYU) rates.UYU = 38;
+                        if (!rates.PYG) rates.PYG = 7300;
+                        if (!rates.PEN) rates.PEN = 3.7;
+                        if (!rates.BRL) rates.BRL = 5;
+                        return;
+                    }
+                } catch(e) { console.log('Rate source failed:', e.message); }
+            }
+            // Hardcoded fallback if all APIs fail
+            rates = { USD: 1, BRL: 5, EUR: 0.92, ARS: 850, UYU: 38, PYG: 7300, PEN: 3.7, GBP: 0.79, JPY: 149 };
         }
 
         // Convert value from currency A to B using BRL as base
@@ -585,29 +607,48 @@
                 let category = null;
                 let valorDetectado = valor ? parseFloat(valor) : null;
 
-                // Try 9Router AI classification
+                // Try 9Router AI classification via /v1/chat/completions
                 try {
-                    const aiResp = await fetch(NINJA_API + '/api/classify', {
+                    const aiResp = await fetch(NINJA_API + '/v1/chat/completions', {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
-                            'X-API-Key': NINJA_KEY
+                            'Authorization': 'Bearer ' + NINJA_KEY
                         },
                         body: JSON.stringify({
-                            text: desc,
-                            model: 'protagnix'
+                            model: 'protagnix',
+                            messages: [
+                                {
+                                    role: 'system',
+                                    content: 'Classifique a transacao financeira. Retorne APENAS JSON valido com: descricao, valor (numero sem R$), tipo (entrada/saida), categoria, confianca. Categorias: Alimentacao, Transporte, Moradia, Saude, Assinaturas, Lazer, Educacao, Renda, Outros.'
+                                },
+                                {
+                                    role: 'user',
+                                    content: desc
+                                }
+                            ]
                         })
                     });
                     if (aiResp.ok) {
                         const aiData = await aiResp.json();
-                        category = aiData.categoria || null;
-                        if (!valorDetectado && aiData.valor) {
-                            valorDetectado = parseFloat(aiData.valor);
+                        const content = aiData.choices?.[0]?.message?.content || '';
+                        // Extract JSON from response
+                        const jsonMatch = content.match(/{[\s\S]*?}/);
+                        if (jsonMatch) {
+                            try {
+                                const parsed = JSON.parse(jsonMatch[0]);
+                                category = parsed.categoria || null;
+                                if (!valorDetectado && parsed.valor) {
+                                    valorDetectado = parseFloat(parsed.valor);
+                                }
+                                status.textContent = '✨ Classificado por IA';
+                            } catch(e) {
+                                console.log('Erro parse JSON da IA');
+                            }
                         }
-                        status.textContent = 'Classificado por IA';
                     }
                 } catch (e) {
-                    console.log('9Router indisponível, fallback local');
+                    console.log('9Router indisponivel, fallback local', e);
                 }
 
                 // Fallback local se IA não responder
@@ -687,6 +728,12 @@
                     <option value="BRL">BRL - Real (R$)</option>
                     <option value="USD">USD - Dólar ($)</option>
                     <option value="EUR">EUR - Euro (€)</option>
+                    <option value="ARS">ARS - Peso ARS ($)</option>
+                    <option value="UYU">UYU - Peso UYU ($)</option>
+                    <option value="PYG">PYG - Guarani (₲)</option>
+                    <option value="PEN">PEN - Sol (S/)</option>
+                    <option value="GBP">GBP - Libra (£)</option>
+                    <option value="JPY">JPY - Iene (¥)</option>
                 </select>
                 
                 <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Notificações</label>
