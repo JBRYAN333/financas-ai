@@ -418,16 +418,18 @@
 
         // Popular select de bancos
         function populateBanks() {
-            const select = document.getElementById('bancoSelect');
-            const importSelect = document.getElementById('importBankSelect');
-            BANKS.forEach(bank => {
-                const opt = document.createElement('option');
-                opt.value = bank;
-                opt.textContent = bank;
-                select.appendChild(opt);
-                const opt2 = opt.cloneNode(true);
-                importSelect.appendChild(opt2);
-            });
+            try {
+                const select = document.getElementById('bancoSelect');
+                const importSelect = document.getElementById('importBankSelect');
+                BANKS.forEach(bank => {
+                    const opt = document.createElement('option');
+                    opt.value = bank;
+                    opt.textContent = bank;
+                    select.appendChild(opt);
+                    const opt2 = opt.cloneNode(true);
+                    importSelect.appendChild(opt2);
+                });
+            } catch(e) { console.log('populateBanks error:', e); }
         }
         populateBanks();
 
@@ -444,6 +446,7 @@
         });
 
         async function loadData() {
+          try {
             // Fetch latest exchange rates
             await fetchRates();
 
@@ -483,6 +486,7 @@
             updateDashboard();
             updateTable();
             populateBankFilter();
+          } catch(e) { console.error('loadData error:', e); document.getElementById('transactionsLoading').textContent = 'Erro: ' + e.message; }
         }
 
         function populateBankFilter() {
