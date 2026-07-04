@@ -897,6 +897,44 @@
             return transactions;
         }
 
+        // Parser JSON robusto: extrai array mesmo com texto/lixo antes ou depois
+        function safeParseJSONArray(text) {
+            if (!text) return [];
+            // Remove markdown code blocks se tiver
+            let clean = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+            // Tenta direto primeiro
+            try { const d = JSON.parse(clean); return Array.isArray(d) ? d : []; } catch(e) {}
+            // Encontra o primeiro [ e faz parse caractere por caractere
+            const start = clean.indexOf('[');
+            if (start === -1) return [];
+            let depth = 0, inString = false, escape = false;
+            for (let i = start; i < clean.length; i++) {
+                const c = clean[i];
+                if (escape) { escape = false; continue; }
+                if (c === '\\' && inString) { escape = true; continue; }
+                if (c === '"') { inString = !inString; continue; }
+                if (inString) continue;
+                if (c === '[') depth++;
+                if (c === ']') depth--;
+                if (depth === 0 && i > start) {
+                    const jsonStr = clean.substring(start, i + 1);
+                    try {
+                        const parsed = JSON.parse(jsonStr);
+                        if (Array.isArray(parsed)) return parsed;
+                    } catch(e) {
+                        // Tenta limpar aspas simples e virgulas finais
+                        const cleaned = jsonStr.replace(/,\s*\]/g, ']').replace(/'/g, '"');
+                        try {
+                            const p2 = JSON.parse(cleaned);
+                            if (Array.isArray(p2)) return p2;
+                        } catch(e2) {}
+                    }
+                    break;
+                }
+            }
+            return [];
+        }
+
         async function classifyExtractWithIA(text) {
             // IA se adapta a qualquer formato de extrato (PDF, OCR, CSV, qualquer banco)
             // Manda em chunks de 4000 chars pra não estourar contexto
@@ -923,11 +961,9 @@
                     if (!resp.ok) continue;
                     const data = await resp.json();
                     const content = data.choices?.[0]?.message?.content || '';
-                    const jsonMatch = content.match(/\[[\s\S]*\]/);
-                    if (jsonMatch) {
-                        const parsed = JSON.parse(jsonMatch[0]);
-                        if (Array.isArray(parsed)) allTransactions.push(...parsed);
-                    }
+                    // Parser JSON robusto: encontra o array e extrai caractere por caractere
+                    const parsed = safeParseJSONArray(content);
+                    if (parsed && parsed.length > 0) allTransactions.push(...parsed);
                 } catch (e) { console.log('IA chunk failed:', e); }
             }
 
