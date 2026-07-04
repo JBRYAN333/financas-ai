@@ -253,6 +253,18 @@
             <p class="subtitle" id="monthLabel">Carregando...</p>
 
             <div style="display:flex;gap:0.7rem;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap">
+                <select id="filterPeriod" onchange="applyPeriod()" style="padding:0.5rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem">
+                    <option value="current">Este mês</option>
+                    <option value="last">Mês passado</option>
+                    <option value="3m">Últimos 3 meses</option>
+                    <option value="6m">Últimos 6 meses</option>
+                    <option value="12m">Últimos 12 meses</option>
+                    <option value="all">Tudo</option>
+                    <option value="custom">Personalizado...</option>
+                </select>
+                <input type="date" id="dateFrom" onchange="applyPeriod()" style="padding:0.5rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem;display:none">
+                <span id="dateSep" style="color:var(--text-dim);display:none">→</span>
+                <input type="date" id="dateTo" onchange="applyPeriod()" style="padding:0.5rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem;display:none">
                 <select id="filterBank" onchange="applyFilters()" style="padding:0.5rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem">
                     <option value="">Todos os bancos</option>
                 </select>
@@ -533,6 +545,75 @@
         }
 
         let filterBank = '';
+        let periodMode = 'current'; // current, last, 3m, 6m, 12m, all, custom
+        let customFrom = null;
+        let customTo = null;
+
+        function applyPeriod() {
+            const sel = document.getElementById('filterPeriod');
+            const fromInput = document.getElementById('dateFrom');
+            const toInput = document.getElementById('dateTo');
+            const sep = document.getElementById('dateSep');
+            periodMode = sel.value;
+            if (periodMode === 'custom') {
+                fromInput.style.display = 'inline';
+                toInput.style.display = 'inline';
+                sep.style.display = 'inline';
+                if (fromInput.value) customFrom = new Date(fromInput.value);
+                if (toInput.value) customTo = new Date(toInput.value + 'T23:59:59');
+            } else {
+                fromInput.style.display = 'none';
+                toInput.style.display = 'none';
+                sep.style.display = 'none';
+            }
+            updateDashboard();
+            updateTable();
+        }
+
+        function getPeriodRange() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = now.getMonth();
+            switch(periodMode) {
+                case 'current':
+                    return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0, 23, 59, 59) };
+                case 'last':
+                    return { from: new Date(y, m - 1, 1), to: new Date(y, m, 0, 23, 59, 59) };
+                case '3m':
+                    return { from: new Date(y, m - 2, 1), to: now };
+                case '6m':
+                    return { from: new Date(y, m - 5, 1), to: now };
+                case '12m':
+                    return { from: new Date(y - 1, m, 1), to: now };
+                case 'all':
+                    return { from: new Date(2000, 0, 1), to: now };
+                case 'custom':
+                    return { from: customFrom || new Date(2000, 0, 1), to: customTo || now };
+                default:
+                    return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0, 23, 59, 59) };
+            }
+        }
+
+        function getPeriodLabel() {
+            const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = now.getMonth();
+            switch(periodMode) {
+                case 'current': return `${monthNames[m]}/${y}`;
+                case 'last': return `${monthNames[m-1 < 0 ? 11 : m-1]}/${m-1 < 0 ? y-1 : y}`;
+                case '3m': return `Últimos 3 meses`;
+                case '6m': return `Últimos 6 meses`;
+                case '12m': return `Últimos 12 meses`;
+                case 'all': return `Todo o período`;
+                case 'custom':
+                    const f = customFrom ? customFrom.toLocaleDateString('pt-BR') : '...';
+                    const t = customTo ? customTo.toLocaleDateString('pt-BR') : '...';
+                    return `${f} → ${t}`;
+                default: return `${monthNames[m]}/${y}`;
+            }
+        }
         function applyFilters() {
             filterBank = document.getElementById('filterBank').value;
             updateDashboard();
@@ -540,9 +621,13 @@
         }
 
         function getFilteredTransactions() {
-            if (!filterBank) return allTransactions;
-            return allTransactions.filter(t => t.bank === filterBank);
-        }
+            const range = getPeriodRange();
+            return allTransactions.filter(t => {
+                if (filterBank && t.bank !== filterBank) return false;
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                if (d < range.from || d > range.to) return false;
+            return true;
+        });
 
         let userCurrency = "BRL";
         let rates = { BRL: 1, USD: 1, EUR: 1 };
@@ -602,7 +687,7 @@
             const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                                 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
             const filterLabel = filterBank ? ` — ${filterBank}` : '';
-            document.getElementById('monthLabel').textContent = `Visão geral de ${monthNames[month]}/${year}${filterLabel}`;
+            document.getElementById('monthLabel').textContent = `Visão geral de ${getPeriodLabel()}${filterLabel}`;
 
             const filtered = getFilteredTransactions();
             const monthTx = filtered.filter(t => {
