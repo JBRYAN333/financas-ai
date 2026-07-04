@@ -792,30 +792,63 @@
             const lines = text.split('\n');
             // Padrões comuns em extratos brasileiros
             const dateRegex = /(\d{2})\/(\d{2})\/(\d{4}|\d{2})/;
-            const valueRegex = /[R]?\$?\s?(\d+[.,]\d{2})/;
+            // Valor: R$ 1.234,56 ou 1.234,56 ou R$1234,56 (precisa ter casa decimal)
+            const valueRegex = /R\$\s?([\d.]+,\d{2})|R\$\s?(\d+,\d{2})/g;
+            // Linhas pra ignorar (cabeçalho, rodapés)
+            const skipPatterns = /cnpj|ag[êe]ncia|conta|ouvidoria|sac|0800|saldo anterior|saldo final|saldos em|data base|d[íi]as [úu]teis|segunda.*sexta|d[ée]bito autom[áa]tico|extrato|demonstrativo|www\.|http|^\s*\d+\s*$|pagina|c[óo]digo|terminal/i;
+
+            const seen = new Set(); // evita duplicatas
 
             for (const line of lines) {
                 const trimmed = line.trim();
-                if (trimmed.length < 5) continue;
+                if (trimmed.length < 10) continue;
+                if (skipPatterns.test(trimmed)) continue;
+
                 const dateMatch = trimmed.match(dateRegex);
-                const valueMatch = trimmed.match(valueRegex);
-                if (dateMatch && valueMatch) {
-                    const date = dateMatch[0];
-                    const value = parseFloat(valueMatch[1].replace(',', '.'));
-                    const isSaida = /sa[ií]da|d[ée]bito|debit|pagamento|compra|transfer.*enviada|pix.*enviada/i.test(trimmed);
-                    const isEntrada = /entrada|cr[ée]dito|recebimento|transfer.*recebida|pix.*recebida|dep[óo]sito/i.test(trimmed);
-                    const desc = trimmed.replace(dateRegex, '').replace(valueRegex, '').trim().substring(0, 200);
-                    if (desc.length < 3) continue;
-                    transactions.push({
-                        date,
-                        description: desc,
-                        value,
-                        type: isEntrada ? 'entrada' : 'saida',
-                        category: categorizeLocal(desc, isEntrada ? 'entrada' : 'saida'),
-                        currency: 'BRL',
-                        source: 'import'
-                    });
-                }
+                if (!dateMatch) continue;
+
+                // Tenta extrair todos os valores da linha
+                const valueMatches = [...trimmed.matchAll(valueRegex)];
+                if (valueMatches.length === 0) continue;
+
+                // Pega o maior valor (geralmente o da transação, não o saldo)
+                const values = valueMatches.map(m => parseFloat((m[1] || m[2] || '0').replace('.', '').replace(',', '.')));
+                const value = Math.max(...values.filter(v => v > 0));
+                if (!value || value <= 0) continue;
+
+                const date = dateMatch[0];
+
+                // Limpa a descrição: remove data, valores, e lixo
+                let desc = trimmed
+                    .replace(dateRegex, '')
+                    .replace(/R\$\s?[\d.,]+/g, '')
+                    .replace(/CNPJ\s*\d.*?\d{2}/i, '')
+                    .replace(/\d+\.\d{3}\/\d{4}/g, '') // CNPJ
+                    .replace(/\b\d{4,}\b/g, '') // números longos
+                    .replace(/[|]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                if (desc.length < 3) continue;
+
+                // Dedupe: chave = date + valor + primeiras palavras da desc
+                const descShort = desc.substring(0, 30).toLowerCase();
+                const dedupKey = `${date}|${value}|${descShort}`;
+                if (seen.has(dedupKey)) continue;
+                seen.add(dedupKey);
+
+                const isSaida = /sa[ií]da|d[ée]bito|debit|pagamento|compra|transfer.*enviada|pix.*enviada|empr[ée]stimo|parcela/i.test(trimmed);
+                const isEntrada = /entrada|cr[ée]dito|recebimento|transfer.*recebida|pix.*recebida|dep[óo]sito|pagamento receb/i.test(trimmed);
+
+                transactions.push({
+                    date,
+                    description: desc.substring(0, 200),
+                    value,
+                    type: isEntrada ? 'entrada' : 'saida',
+                    category: categorizeLocal(desc, isEntrada ? 'entrada' : 'saida'),
+                    currency: 'BRL',
+                    source: 'import'
+                });
             }
             return transactions;
         }
