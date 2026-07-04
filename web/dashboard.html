@@ -681,10 +681,11 @@
                 const transaction = {
                     date: new Date(),
                     description: desc,
-                    valueOriginal: valorDetectado || 0,
+                    value: valorDetectado || 0,
                     currency: moedaOrigem,
                     type: tipo,
                     category: category,
+                    source: 'manual',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
