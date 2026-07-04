@@ -293,6 +293,14 @@
                 <h3>📋 Últimas transações <span id="transCount"></span></h3>
                 <div id="transactionsLoading" class="loading">⏳ Carregando...</div>
                 <div id="transactionsTableContainer" style="display:none">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                        <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
+                        <div style="display:flex;gap:0.5rem">
+                            <button onclick="exportCSV()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">📥 CSV</button>
+                            <button onclick="prevPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="prevBtn">◀</button>
+                            <button onclick="nextPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="nextBtn">▶</button>
+                        </div>
+                    </div>
                     <table>
                         <thead><tr>
                             <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th>
@@ -383,6 +391,8 @@
 
         let userCurrency = "BRL";
         let rates = { BRL: 1, USD: 1, EUR: 1 };
+        let currentPage = 1;
+        const PAGE_SIZE = 30;
 
         // Fetch latest rates with fallback chain + regional currencies
         async function fetchRates() {
@@ -575,7 +585,19 @@
             const tbody = document.getElementById('transactionsBody');
             tbody.innerHTML = '';
 
-            allTransactions.slice(0, 30).forEach(t => {
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const end = Math.min(start + PAGE_SIZE, allTransactions.length);
+            const page = allTransactions.slice(start, end);
+
+            if (allTransactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:2rem">Nenhuma transação encontrada</td></tr>';
+                document.getElementById('pageInfo').textContent = '';
+                return;
+            }
+
+            document.getElementById('pageInfo').textContent = `${start + 1}-${end} de ${allTransactions.length}`;
+
+            page.forEach(t => {
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
                 const tr = document.createElement('tr');
                 const catLabel = t.category || '—';
@@ -600,6 +622,31 @@
             await db.collection('users').doc(currentUser.uid)
                 .collection('transactions').doc(id).delete();
             await loadData();
+        }
+
+        // Paginação
+        function prevPage() {
+            if (currentPage > 1) { currentPage--; updateTable(); }
+        }
+        function nextPage() {
+            if (currentPage * PAGE_SIZE < allTransactions.length) { currentPage++; updateTable(); }
+        }
+
+        // Exportar CSV
+        function exportCSV() {
+            let csv = 'Data;Descrição;Valor;Tipo;Categoria;Moeda\n';
+            allTransactions.forEach(t => {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                const dateStr = d.toLocaleDateString('pt-BR');
+                const desc = (t.description || '').replace(/"/g, '""');
+                const val = t.value || t.valueOriginal || 0;
+                csv += `${dateStr};"${desc}";${val};${t.type};${t.category || 'Outros'};${t.currency || 'BRL'}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'financas-export.csv';
+            link.click();
         }
 
         // Add transaction form
