@@ -789,63 +789,84 @@
 
         function parseExtractedText(text) {
             const transactions = [];
-            const lines = text.split('\n');
-            // Padrões comuns em extratos brasileiros
-            const dateRegex = /(\d{2})\/(\d{2})\/(\d{4}|\d{2})/;
-            // Valor: R$ 1.234,56 ou 1.234,56 ou R$1234,56 (precisa ter casa decimal)
-            const valueRegex = /R\$\s?([\d.]+,\d{2})|R\$\s?(\d+,\d{2})/g;
-            // Linhas pra ignorar (cabeçalho, rodapés)
-            const skipPatterns = /cnpj|ag[êe]ncia|conta|ouvidoria|sac|0800|saldo anterior|saldo final|saldos em|data base|d[íi]as [úu]teis|segunda.*sexta|d[ée]bito autom[áa]tico|extrato|demonstrativo|www\.|http|^\s*\d+\s*$|pagina|c[óo]digo|terminal/i;
+            const seen = new Set();
 
-            const seen = new Set(); // evita duplicatas
+            // Extrai TODAS as transações do texto usando o padrão +/- R$ valor descrição
+            // Funciona pra qualquer banco brasileiro (Cora, Nubank, Itaú, etc)
+            // Padrão: + R$ 69,90 Transf Pix recebida NOME... ou - R$ 69,60 Pgto QR Code Pix NOME...
+            const txRegex = /([+-])\s*R\$\s?([\d.]+,\d{2})\s+(.*?)(?=\s*[+-]\s*R\$\s?[\d.]+,\d{2}|$)/g;
+            // Padrão de data dd/mm/yyyy para rastrear a data atual
+            const dateLineRegex = /(\d{2})\/(\d{2})\/(\d{4})/;
 
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (trimmed.length < 10) continue;
-                if (skipPatterns.test(trimmed)) continue;
+            // Primeiro, quebra o texto em blocos por data (linha com Saldo do dia ou data no início)
+            const blocks = [];
+            let currentDate = null;
+            let currentText = '';
+            // Remove cabeçalhos repetidos (instituição, CNPJ, ouvidoria, etc)
+            const cleanText = text.replace(/INSTITUICAO.*?das 9:00 às 18:00/gi, '').replace(/Extrato gerado no dia.*?pág \d+ de \d+/gi, '').replace(/Transações Extrato do período/gi, '').replace(/Saldo inicial disponível.*?R$ [\d.,]+/gi, '').replace(/Total de entradas.*?R$ [\d.,]+/gi, '').replace(/Total de saídas.*?R$ [\d.,]+/gi, '').replace(/Saldo final disponível.*?R$ [\d.,]+/gi, '').replace(/Saldo do dia R$ [\d.,]+/gi, '');
 
-                const dateMatch = trimmed.match(dateRegex);
-                if (!dateMatch) continue;
+            // Agora processa o texto limpo
+            const lines = cleanText.split('\n');
+            let fullText = lines.join(' ');
 
-                // Tenta extrair todos os valores da linha
-                const valueMatches = [...trimmed.matchAll(valueRegex)];
-                if (valueMatches.length === 0) continue;
+            // Rastreia data: encontra todas as datas e suas posições no texto
+            const datePositions = [];
+            const dateRegexGlobal = /(\d{2})\/(\d{2})\/(\d{4})/g;
+            let dm;
+            while ((dm = dateRegexGlobal.exec(fullText)) !== null) {
+                datePositions.push({ date: dm[0], index: dm.index });
+            }
 
-                // Pega o maior valor (geralmente o da transação, não o saldo)
-                const values = valueMatches.map(m => parseFloat((m[1] || m[2] || '0').replace('.', '').replace(',', '.')));
-                const value = Math.max(...values.filter(v => v > 0));
+            // Extrai transações
+            let match;
+            while ((match = txRegex.exec(fullText)) !== null) {
+                const signal = match[1]; // + ou -
+                const valueStr = match[2]; // ex: 69,90 ou 1.234,56
+                let desc = match[3] ? match[3].trim() : '';
+
+                // Limpa valor: 1.234,56 -> 1234.56
+                const value = parseFloat(valueStr.replace('.', '').replace(',', '.'));
                 if (!value || value <= 0) continue;
 
-                const date = dateMatch[0];
+                // Encontra a data mais próxima ANTES desta transação no texto
+                const txPos = match.index;
+                let bestDate = null;
+                for (const dp of datePositions) {
+                    if (dp.index <= txPos) bestDate = dp.date;
+                    else break;
+                }
+                if (!bestDate) continue;
 
-                // Limpa a descrição: remove data, valores, e lixo
-                let desc = trimmed
-                    .replace(dateRegex, '')
-                    .replace(/R\$\s?[\d.,]+/g, '')
-                    .replace(/CNPJ\s*\d.*?\d{2}/i, '')
-                    .replace(/\d+\.\d{3}\/\d{4}/g, '') // CNPJ
-                    .replace(/\b\d{4,}\b/g, '') // números longos
-                    .replace(/[|]+/g, ' ')
+                // Limpa descrição
+                desc = desc
+                    .replace(/\d{2}\/\d{2}\/\d{4}/g, '') // remove datas
+                    .replace(/CNPJ\s*\d+.*?\d{2}/gi, '') // remove CNPJs
+                    .replace(/\d{3}\.\d{3}\.\d{3}-\d{2}/g, '') // remove CPFs
+                    .replace(/\d+\.\d{3}\/\d{4}-\d{2}/g, '') // remove CNPJ format
+                    .replace(/\d+\.\d{3}\.\d{3}\/\d{4}-\d{2}/g, '') // CNPJ completo
+                    .replace(/…/g, '')
+                    .replace(/Pggo/gi, 'Pagamento')
+                    .replace(/Pgto/gi, 'Pagamento')
+                    .replace(/\s+\d+\.\d+$/g, '') // numeros soltos no final
                     .replace(/\s+/g, ' ')
                     .trim();
 
                 if (desc.length < 3) continue;
+                if (/^saldo|extrato|demonstrativo/i.test(desc)) continue;
 
-                // Dedupe: chave = date + valor + primeiras palavras da desc
-                const descShort = desc.substring(0, 30).toLowerCase();
-                const dedupKey = `${date}|${value}|${descShort}`;
+                // Dedupe
+                const dedupKey = `${bestDate}|${value}|${desc.substring(0, 30).toLowerCase()}`;
                 if (seen.has(dedupKey)) continue;
                 seen.add(dedupKey);
 
-                const isSaida = /sa[ií]da|d[ée]bito|debit|pagamento|compra|transfer.*enviada|pix.*enviada|empr[ée]stimo|parcela/i.test(trimmed);
-                const isEntrada = /entrada|cr[ée]dito|recebimento|transfer.*recebida|pix.*recebida|dep[óo]sito|pagamento receb/i.test(trimmed);
+                const type = signal === '+' ? 'entrada' : 'saida';
 
                 transactions.push({
-                    date,
+                    date: bestDate,
                     description: desc.substring(0, 200),
                     value,
-                    type: isEntrada ? 'entrada' : 'saida',
-                    category: categorizeLocal(desc, isEntrada ? 'entrada' : 'saida'),
+                    type,
+                    category: categorizeLocal(desc, type),
                     currency: 'BRL',
                     source: 'import'
                 });
