@@ -724,21 +724,22 @@
                     return;
                 }
 
-                status.textContent = '🧠 Analisando transações...';
-                const transactions = parseExtractedText(text);
+                status.textContent = '🧠 IA analisando extrato... (pode levar 15-30s)';
+                // IA primeiro — se adapta a qualquer banco/formato
+                let iaResult = await classifyExtractWithIA(text);
 
-                if (transactions.length === 0) {
-                    // Tenta classificação via IA (sem expor chave - usa endpoint existente)
-                    status.textContent = '🧠 Enviando pra IA classificar...';
-                    const iaResult = await classifyExtractWithIA(text);
-                    if (iaResult && iaResult.length > 0) {
-                        pendingImport = iaResult;
+                if (!iaResult || iaResult.length === 0) {
+                    // Fallback: parser local se IA falhar
+                    status.textContent = '⏳ IA sem resposta, tentando parser local...';
+                    const localResult = parseExtractedText(text);
+                    if (localResult.length > 0) {
+                        pendingImport = localResult;
                     } else {
-                        status.textContent = '❌ Não encontrei transações no arquivo. Tente outro formato.';
+                        status.textContent = '❌ Não encontrei transações. Verifique se o arquivo é um extrato bancário.';
                         return;
                     }
                 } else {
-                    pendingImport = transactions;
+                    pendingImport = iaResult;
                 }
 
                 // Mostra preview
@@ -875,28 +876,47 @@
         }
 
         async function classifyExtractWithIA(text) {
-            // Usa o endpoint /v1/chat/completions existente do 9Router
-            // sem expor a chave - mandamos só um trecho pra classificar
-            const chunk = text.substring(0, 3000);
-            try {
-                const resp = await fetch(NINJA_API + '/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': '***' + NINJA_KEY },
-                    body: JSON.stringify({
-                        model: 'protagnix',
-                        messages: [
-                            { role: 'system', content: 'Extraia todas as transacoes financeiras do texto. Retorne APENAS um array JSON: [{"date":"DD/MM/YYYY","description":"texto","value":0.00,"type":"entrada ou saida","category":"categoria"}]. Categorias: Alimentacao, Transporte, Moradia, Saude, Assinaturas, Lazer, Educacao, Renda, Outros.' },
-                            { role: 'user', content: chunk }
-                        ]
-                    })
-                });
-                if (!resp.ok) return [];
-                const data = await resp.json();
-                const content = data.choices?.[0]?.message?.content || '';
-                const jsonMatch = content.match(/\[[\s\S]*\]/);
-                if (jsonMatch) return JSON.parse(jsonMatch[0]);
-            } catch (e) { console.log('IA classify failed:', e); }
-            return [];
+            // IA se adapta a qualquer formato de extrato (PDF, OCR, CSV, qualquer banco)
+            // Manda em chunks de 4000 chars pra não estourar contexto
+            const allTransactions = [];
+            const chunkSize = 4000;
+            const chunks = [];
+            for (let i = 0; i < text.length; i += chunkSize) {
+                chunks.push(text.substring(i, i + chunkSize));
+            }
+
+            for (let i = 0; i < chunks.length; i++) {
+                try {
+                    const resp = await fetch(NINJA_API + '/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + NINJA_KEY },
+                        body: JSON.stringify({
+                            model: 'protagnix',
+                            messages: [
+                                { role: 'system', content: 'Você é um extrator de transações financeiras. Analise o texto (pode ser extrato bancário de qualquer banco brasileiro, em qualquer formato). Extraia TODAS as transações encontradas. Retorne APENAS um array JSON válido, sem markdown, sem explicação:\n[{"date":"DD/MM/YYYY","description":"descrição limpa da transação","value":0.00,"type":"entrada ou saida","category":"categoria"}]\n\nRegras:\n- date: data da transação no formato DD/MM/YYYY. Se não tiver ano, use 2026.\n- description: descrição limpa (sem CPF, CNPJ, números de conta, códigos). Máximo 200 chars.\n- value: valor numérico com ponto decimal (ex: 69.90, nao 69,90).\n- type: "entrada" se for recebimento/crédito, "saida" se for pagamento/débito.\n- category: uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.\n- Ignore linhas de saldo, cabeçalho, rodapé, totais.\n- Se não encontrar nenhuma transação, retorne [].' },
+                                { role: 'user', content: chunks[i] }
+                            ]
+                        })
+                    });
+                    if (!resp.ok) continue;
+                    const data = await resp.json();
+                    const content = data.choices?.[0]?.message?.content || '';
+                    const jsonMatch = content.match(/\[[\s\S]*\]/);
+                    if (jsonMatch) {
+                        const parsed = JSON.parse(jsonMatch[0]);
+                        if (Array.isArray(parsed)) allTransactions.push(...parsed);
+                    }
+                } catch (e) { console.log('IA chunk failed:', e); }
+            }
+
+            // Dedup
+            const seen = new Set();
+            return allTransactions.filter(t => {
+                const key = `${t.date}|${t.value}|${(t.description||'').substring(0,30).toLowerCase()}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
         }
 
         async function confirmImport() {
