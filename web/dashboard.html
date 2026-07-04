@@ -11,7 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs" type="module"></script>
+    <script src="https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.min.mjs" type="module"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
     <style>
         :root {
@@ -626,8 +626,9 @@
                 if (filterBank && t.bank !== filterBank) return false;
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
                 if (d < range.from || d > range.to) return false;
-            return true;
-        });
+                return true;
+            });
+        }
 
         let userCurrency = "BRL";
         let rates = { BRL: 1, USD: 1, EUR: 1 };
