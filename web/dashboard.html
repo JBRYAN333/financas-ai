@@ -217,21 +217,20 @@
                 <div style="background:linear-gradient(135deg,#22c55e,#06b6d4);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:#052e16">FAI</div>
                 <div>
                     <div style="font-weight:700;font-size:1rem">Financas AI</div>
-                    <div style="font-size:0.7rem;color:var(--text-dim)">💰 inteligente</div>
+                    <div style="font-size:0.7rem;color:var(--text-dim)">inteligente</div>
                 </div>
             </div>
-            <a href="#" class="active">📊 <span>Dashboard</span></a>
-            <a href="https://t.me/YourBot" target="_blank">📱 <span>Telegram</span></a>
-            <a href="index.html">🏠 <span>Início</span></a>
+            <a href="#" class="active" style="gap:0"><span>Dashboard</span></a>
+            <a href="index.html" style="gap:0"><span>Início</span></a>
             <div class="user-info">
                 <div style="color:var(--text);font-weight:500" id="userName">—</div>
                 <div class="email" id="userEmail">—</div>
-                <button class="logout-btn" style="border-color:var(--blue);color:var(--blue);margin-top:0.2rem" onclick="showSettings()">⚙️ <span>Config</span></button>
-                <button class="logout-btn" onclick="handleLogout()">🚪 <span>Sair</span></button>
+                <button class="logout-btn" style="border-color:var(--blue);color:var(--blue);margin-top:0.2rem" onclick="showSettings()">Config</button>
+                <button class="logout-btn" onclick="handleLogout()">Sair</button>
             </div>
         </div>
         <div class="main">
-            <h1>📊 Dashboard</h1>
+            <h1>Dashboard</h1>
             <p class="subtitle" id="monthLabel">Carregando...</p>
 
             <div class="stats-grid">
@@ -271,7 +270,7 @@
                     <input type="text" id="descInput" placeholder='Ex: "Comprei pão no mercado R$ 35,90"' required>
                     <select id="tipoSelect">
                         <option value="saida">💸 Saída</option>
-                        <option value="entrada">💰 Entrada</option>
+                        <option value="entrada">Entrada</option>
                     </select>
                     <select id="moedaSelect" style="min-width:80px;flex:0.3">
                         <option value="BRL">BRL R$</option>
@@ -557,7 +556,7 @@
                     <td class="${t.type === 'entrada' ? 'positive' : 'negative'}">
                         ${t.type === 'entrada' ? '+' : '-'} ${formatValue(valueOrig, curr)}${showOriginal ? ` <span style="font-size:0.65rem;color:var(--text-dim)">(${parseFloat(valueOrig).toFixed(2)} ${curr})</span>` : ''}
                     </td>
-                    <td><button class="delete-btn" onclick="deleteTransaction('${t.id}')">✕</button></td>
+                    <td><button class="delete-btn" onclick="deleteTransaction('${t.id}')">×</button></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -580,7 +579,7 @@
 
             if (!desc) return;
 
-            status.textContent = '🤔 Classificando com IA...';
+            status.textContent = 'Classificando com IA…';
 
             try {
                 let category = null;
@@ -605,7 +604,7 @@
                         if (!valorDetectado && aiData.valor) {
                             valorDetectado = parseFloat(aiData.valor);
                         }
-                        status.textContent = '🤖 Classificado por IA';
+                        status.textContent = 'Classificado por IA';
                     }
                 } catch (e) {
                     console.log('9Router indisponível, fallback local');
@@ -624,7 +623,7 @@
                         category = 'Renda';
                     else
                         category = 'Outros';
-                    status.textContent = '🔍 Categoria: ' + category;
+                    status.textContent = 'Categoria: ' + category;
                 }
 
                 if (!valorDetectado) {
@@ -653,12 +652,12 @@
 
                 document.getElementById('descInput').value = '';
                 document.getElementById('valorInput').value = '';
-                status.textContent = '✅ Adicionado! (' + moedaOrigem + ')';
+                status.textContent = 'Adicionado! (' + moedaOrigem + ')';
                 setTimeout(() => { status.textContent = ''; }, 3000);
                 await loadData();
 
             } catch (err) {
-                status.textContent = '❌ Erro: ' + err.message;
+                status.textContent = 'Erro: ' + err.message;
             }
         });
 
@@ -681,13 +680,13 @@
             card.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;max-width:420px;width:100%';
             
             card.innerHTML = `
-                <h3 style="margin-bottom:1.5rem">⚙️ Configurações</h3>
+                <h3 style="margin-bottom:1.5rem">Configurações</h3>
                 
                 <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Moeda principal</label>
                 <select id="userCurrency" style="width:100%;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem;margin-bottom:1.5rem">
-                    <option value="BRL">🇧🇷 BRL - Real (R$)</option>
-                    <option value="USD">🇺🇸 USD - Dólar ($)</option>
-                    <option value="EUR">🇪🇺 EUR - Euro (€)</option>
+                    <option value="BRL">BRL - Real (R$)</option>
+                    <option value="USD">USD - Dólar ($)</option>
+                    <option value="EUR">EUR - Euro (€)</option>
                 </select>
                 
                 <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Notificações</label>
@@ -701,15 +700,15 @@
                 </div>
                 
                 <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Dados (LGPD)</label>
-                <button onclick="if(confirm('Tem certeza? Todos os seus dados serão apagados.')) deleteAllMyData()" style="background:none;border:1px solid var(--red);color:var(--red);padding:0.5rem 1rem;border-radius:8px;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:1.5rem">🗑️ Excluir todos os meus dados</button>
+                <button onclick="if(confirm('Tem certeza? Todos os seus dados serão apagados.')) deleteAllMyData()" style="background:none;border:1px solid var(--red);color:var(--red);padding:0.5rem 1rem;border-radius:8px;cursor:pointer;font-family:inherit;font-size:0.85rem;margin-bottom:1.5rem">Excluir todos os meus dados</button>
                 
                 <div style="font-size:0.75rem;color:var(--text-dim);border-top:1px solid var(--border);padding-top:1rem">
-                    <a href="https://github.com/JBRYAN333/financas-ai/blob/main/PRIVACY.md" target="_blank" style="color:var(--blue)">📜 Privacidade</a>
+                    <a href="https://github.com/JBRYAN333/financas-ai/blob/main/PRIVACY.md" target="_blank" style="color:var(--blue)">Privacidade</a>
                     <span style="margin:0 0.5rem">•</span>
-                    <a href="https://github.com/JBRYAN333/financas-ai/blob/main/web/TERMS.md" target="_blank" style="color:var(--blue)">⚖️ Termos</a>
+                    <a href="https://github.com/JBRYAN333/financas-ai/blob/main/web/TERMS.md" target="_blank" style="color:var(--blue)">Termos</a>
                 </div>
                 
-                <button onclick="saveSettings()" style="margin-top:1rem;width:100%;padding:0.7rem;background:var(--green);color:#052e16;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">💾 Salvar</button>
+                <button onclick="saveSettings()" style="margin-top:1rem;width:100%;padding:0.7rem;background:var(--green);color:#052e16;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">Salvar</button>
                 <button onclick="document.getElementById('settingsModal').remove()" style="margin-top:0.5rem;width:100%;padding:0.7rem;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:8px;cursor:pointer;font-family:inherit;font-size:0.85rem">Fechar</button>
             `;
             
@@ -741,7 +740,7 @@
                 notifications: { telegram, discord }
             }, { merge: true });
             document.getElementById('settingsModal').remove();
-            alert('✅ Configurações salvas!');
+            alert('Configurações salvas!');
             loadData();
         }
 
@@ -752,7 +751,7 @@
             snapshot.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
             await db.collection('users').doc(currentUser.uid).delete();
-            alert('✅ Todos os seus dados foram excluídos.');
+            alert('Todos os seus dados foram excluídos.');
             auth.signOut();
             window.location.href = 'index.html';
         }

@@ -189,7 +189,7 @@
             box-shadow: 0 0 30px rgba(34,197,94,0.1);
         }
         .pricing-card.featured::before {
-            content: '🔥 Melhor valor';
+            content: 'Melhor valor';
             position: absolute;
             top: -12px;
             left: 50%;
@@ -209,7 +209,7 @@
             color: var(--text-dim);
             font-size: 0.9rem;
         }
-        .pricing-card li::before { content: '✅ '; }
+        .pricing-card li::before { content: '✓ '; }
 
         /* Footer */
         footer {
@@ -256,7 +256,7 @@
     </div>
 
     <section class="hero">
-        <div class="hero-badge">🤖 IA classifica seus gastos automaticamente</div>
+        <div class="hero-badge">IA classifica seus gastos automaticamente</div>
         <h1>Finanças que<br><span>entendem você</span></h1>
         <p>
             Chega de planilhas confusas. Descreva seu gasto em português 
@@ -275,32 +275,44 @@
         <h2>Como funciona</h2>
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">🗣️</div>
+                <div class="feature-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
                 <h3>Descreva em português</h3>
                 <p>"Comprei pão e leite por R$ 35,90 no mercado" — nossa IA entende e classifica.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">🤖</div>
+                <div class="feature-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
                 <h3>IA classifica tudo</h3>
                 <p>Automaticamente separa em categorias: alimentação, transporte, moradia...</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">📊</div>
+                <div class="feature-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg>
+                </div>
                 <h3>Dashboard em tempo real</h3>
                 <p>Gráficos claros de entrada vs saída, gastos por categoria, saldo atual.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">📱</div>
+                <div class="feature-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
                 <h3>Notificações no Telegram</h3>
                 <p>Receba alertas de saldo baixo, resumo semanal e metas atingidas.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">🔒</div>
+                <div class="feature-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
                 <h3>Seus dados, seu controle</h3>
                 <p>Firebase com criptografia. Cada usuário vê só os próprios dados.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">💰</div>
+                <div class="feature-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
                 <h3>Grátis pra começar</h3>
                 <p>Plano Free com 50 lançamentos/mês. Upgrade só quando precisar.</p>
             </div>
@@ -340,8 +352,8 @@
     <footer>
         <p>Feito com ☕ por <a href="https://github.com/JBRYAN333" target="_blank">NixRyan</a> • 
         <a href="#" onclick="handleLogin()">Entrar</a> • 
-        <a href="https://github.com/JBRYAN333/financas-ai/blob/main/PRIVACY.md" target="_blank">📜 Privacidade</a> • 
-        <a href="https://github.com/JBRYAN333/financas-ai/blob/main/web/TERMS.md" target="_blank">⚖️ Termos</a></p>
+        <a href="https://github.com/JBRYAN333/financas-ai/blob/main/PRIVACY.md" target="_blank">Privacidade</a> • 
+        <a href="https://github.com/JBRYAN333/financas-ai/blob/main/web/TERMS.md" target="_blank">Termos</a></p>
     </footer>
 
     <script>
