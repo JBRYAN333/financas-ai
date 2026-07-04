@@ -30,10 +30,11 @@
             font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg);
             color: var(--text);
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
         }
         /* Layout */
-        .app { display: flex; min-height: 100vh; }
+        .app { display: flex; height: 100vh; }
         .sidebar {
             width: 240px;
             background: var(--card);
@@ -43,6 +44,8 @@
             flex-direction: column;
             gap: 0.5rem;
             flex-shrink: 0;
+            height: 100vh;
+            overflow-y: auto;
         }
         .sidebar h2 {
             font-size: 1.2rem;
@@ -71,6 +74,17 @@
             border-top: 1px solid var(--border);
             font-size: 0.85rem;
         }
+        .bank-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: rgba(59,130,246,0.1);
+            color: var(--blue);
+            padding: 0.15rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
         .sidebar .user-info .email { color: var(--text-dim); }
         .sidebar .logout-btn {
             background: none;
@@ -88,6 +102,7 @@
             flex: 1;
             padding: 2rem;
             overflow-y: auto;
+            height: 100vh;
         }
         .main h1 { margin-bottom: 0.5rem; }
         .main .subtitle { color: var(--text-dim); margin-bottom: 2rem; }
@@ -224,6 +239,8 @@
             </div>
             <a href="#" class="active" style="gap:0"><span>Dashboard</span></a>
             <a href="index.html" style="gap:0"><span>Início</span></a>
+            <div style="padding:0.7rem 1rem 0;margin-top:1rem;font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em">Bancos</div>
+            <div id="bankList" style="display:flex;flex-direction:column;gap:0.2rem"></div>
             <div class="user-info">
                 <div style="color:var(--text);font-weight:500" id="userName">—</div>
                 <div class="email" id="userEmail">—</div>
@@ -234,6 +251,12 @@
         <div class="main">
             <h1>Dashboard</h1>
             <p class="subtitle" id="monthLabel">Carregando...</p>
+
+            <div style="display:flex;gap:0.7rem;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap">
+                <select id="filterBank" onchange="applyFilters()" style="padding:0.5rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem">
+                    <option value="">Todos os bancos</option>
+                </select>
+            </div>
 
             <div class="stats-grid">
                 <div class="stat-card">
@@ -274,6 +297,9 @@
                         <option value="saida">💸 Saída</option>
                         <option value="entrada">Entrada</option>
                     </select>
+                    <select id="bancoSelect" style="min-width:140px;flex:0.5">
+                        <option value="">— Banco —</option>
+                    </select>
                     <select id="moedaSelect" style="min-width:100px;flex:0.3">
                         <option value="BRL">BRL R$</option>
                         <option value="USD">USD $</option>
@@ -297,6 +323,9 @@
                 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
                     <input type="file" id="importFile" accept=".pdf,.png,.jpg,.jpeg,.csv" style="display:none">
                     <label for="importFile" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.7rem 1.5rem;color:var(--text);cursor:pointer;font-size:0.9rem;font-weight:600">📎 Selecionar arquivo</label>
+                    <select id="importBankSelect" style="min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <option value="">Banco do extrato</option>
+                    </select>
                     <span id="importFileName" style="font-size:0.85rem;color:var(--text-dim)"></span>
                     <button id="importBtn" onclick="processImport()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.9rem;display:none">Importar</button>
                 </div>
@@ -317,6 +346,7 @@
                                 <th style="text-align:left;padding:0.4rem">Valor</th>
                                 <th style="text-align:left;padding:0.4rem">Tipo</th>
                                 <th style="text-align:left;padding:0.4rem">Categoria</th>
+                                <th style="text-align:left;padding:0.4rem">Banco</th>
                             </tr></thead>
                             <tbody id="previewBody"></tbody>
                         </table>
@@ -338,7 +368,7 @@
                     </div>
                     <table>
                         <thead><tr>
-                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th></th>
+                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th></th>
                         </tr></thead>
                         <tbody id="transactionsBody"></tbody>
                     </table>
@@ -370,6 +400,36 @@
         let allTransactions = [];
         let chartLinha = null;
         let chartPizza = null;
+
+        // Lista de bancos (nacionais + internacionais)
+        const BANKS = [
+            'Cora', 'Nubank', 'Itaú', 'Bradesco', 'Caixa', 'Santander', 'Inter', 'C6 Bank',
+            'BS2', 'BMG', 'Sofisa', 'Neon', 'PagBank', 'Mercado Pago', 'PicPay', 'Stone',
+            'Limite um', 'BTG Pactual', 'Iti', 'Brasilbank', 'Votorantim', 'Original',
+            'Modal', 'Sicusso', 'XP Investimentos', 'AgZero', 'Jurímé', 'Fazaña',
+            'Nubank EUA', 'Wise', 'PayPal', 'Revolut', 'Cash App', 'Chime', 'Ally Bank',
+            'Chase', 'Bank of America', 'Wells Fargo', 'Capital One', 'HSBC',
+            'N26', 'Monzo', 'Revolut EUA', ' bunq', 'Klarna',
+            'MercadoLibre', 'DolarApp', 'Belvo', 'Bitso', 'Lemon Cash',
+            'Brubank', 'Personal Pay', 'Uala', 'Naranja X',
+            ' Banco de Bogotá', 'Bancolombia', 'Davivienda',
+            'Carteira', 'Dinheiro', 'Outro'
+        ].sort();
+
+        // Popular select de bancos
+        function populateBanks() {
+            const select = document.getElementById('bancoSelect');
+            const importSelect = document.getElementById('importBankSelect');
+            BANKS.forEach(bank => {
+                const opt = document.createElement('option');
+                opt.value = bank;
+                opt.textContent = bank;
+                select.appendChild(opt);
+                const opt2 = opt.cloneNode(true);
+                importSelect.appendChild(opt2);
+            });
+        }
+        populateBanks();
 
         // Auth state
         auth.onAuthStateChanged(async (user) => {
@@ -422,6 +482,62 @@
 
             updateDashboard();
             updateTable();
+            populateBankFilter();
+        }
+
+        function populateBankFilter() {
+            const filter = document.getElementById('filterBank');
+            const currentValue = filter.value;
+            const banks = [...new Set(allTransactions.map(t => t.bank).filter(Boolean))].sort();
+            filter.innerHTML = '<option value="">Todos os bancos</option>';
+            banks.forEach(bank => {
+                const opt = document.createElement('option');
+                opt.value = bank;
+                opt.textContent = bank;
+                filter.appendChild(opt);
+            });
+            if (currentValue) filter.value = currentValue;
+            updateBankList();
+        }
+
+        function updateBankList() {
+            const container = document.getElementById('bankList');
+            if (!container) return;
+            const banks = [...new Set(allTransactions.map(t => t.bank).filter(Boolean))].sort();
+            if (banks.length === 0) {
+                container.innerHTML = '<div style="font-size:0.8rem;padding:0.5rem 1rem;color:var(--text-dim)">Nenhum banco ainda</div>';
+                return;
+            }
+            container.innerHTML = '';
+            banks.forEach(bank => {
+                const bankTx = allTransactions.filter(t => t.bank === bank);
+                let saldo = 0;
+                bankTx.forEach(t => {
+                    const v = parseFloat(t.valueOriginal || t.value || 0);
+                    const c = t.currency || 'BRL';
+                    if (t.type === 'entrada') saldo += convert(v, c, userCurrency);
+                    else saldo -= convert(v, c, userCurrency);
+                });
+                const isActive = filterBank === bank;
+                const a = document.createElement('a');
+                a.href = '#';
+                a.style.cssText = `padding:0.5rem 1rem;font-size:0.82rem;cursor:pointer;${isActive ? 'background:rgba(34,197,94,0.1);color:var(--text);border-left:3px solid var(--green)' : ''}`;
+                a.innerHTML = `<span>${bank}</span><span style="margin-left:auto;font-size:0.75rem;color:${saldo >= 0 ? 'var(--green)' : 'var(--red)'}">${formatValue(Math.abs(saldo))}</span>`;
+                a.onclick = (e) => { e.preventDefault(); filterBank = isActive ? '' : bank; document.getElementById('filterBank').value = filterBank; updateDashboard(); updateTable(); populateBankFilter(); };
+                container.appendChild(a);
+            });
+        }
+
+        let filterBank = '';
+        function applyFilters() {
+            filterBank = document.getElementById('filterBank').value;
+            updateDashboard();
+            updateTable();
+        }
+
+        function getFilteredTransactions() {
+            if (!filterBank) return allTransactions;
+            return allTransactions.filter(t => t.bank === filterBank);
         }
 
         let userCurrency = "BRL";
@@ -481,9 +597,11 @@
             
             const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                                 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-            document.getElementById('monthLabel').textContent = `Visão geral de ${monthNames[month]}/${year}`;
+            const filterLabel = filterBank ? ` — ${filterBank}` : '';
+            document.getElementById('monthLabel').textContent = `Visão geral de ${monthNames[month]}/${year}${filterLabel}`;
 
-            const monthTx = allTransactions.filter(t => {
+            const filtered = getFilteredTransactions();
+            const monthTx = filtered.filter(t => {
                 if (!t.date) return false;
                 const d = t.date.toDate ? t.date.toDate() : new Date(t.date);
                 return d.getMonth() === month && d.getFullYear() === year;
@@ -502,8 +620,8 @@
                 else saldo -= converted;
             };
 
-            // Calculate balance from all transactions in order
-            const ordered = [...allTransactions].reverse();
+            // Calculate balance from filtered transactions in order
+            const ordered = [...filtered].reverse();
             ordered.forEach(t => {
                 if (t.type === 'entrada') sumConverted(t, true);
                 else sumConverted(t, false);
@@ -527,9 +645,9 @@
             document.getElementById('saldo').className = 'value ' + (saldo >= 0 ? 'positive' : 'negative');
             document.getElementById('entradas').textContent = formatValue(entradas);
             document.getElementById('saidas').textContent = formatValue(saidas);
-            document.getElementById('totalTransacoes').textContent = allTransactions.length;
+            document.getElementById('totalTransacoes').textContent = filtered.length;
             document.getElementById('monthTransacoes').textContent = monthTx.length + ' este mês';
-            document.getElementById('transCount').textContent = `(${allTransactions.length})`;
+            document.getElementById('transCount').textContent = `(${filtered.length})`;
 
             // Charts
             updateCharts(ordered, categories);
@@ -620,17 +738,18 @@
             const tbody = document.getElementById('transactionsBody');
             tbody.innerHTML = '';
 
+            const filtered = getFilteredTransactions();
             const start = (currentPage - 1) * PAGE_SIZE;
-            const end = Math.min(start + PAGE_SIZE, allTransactions.length);
-            const page = allTransactions.slice(start, end);
+            const end = Math.min(start + PAGE_SIZE, filtered.length);
+            const page = filtered.slice(start, end);
 
-            if (allTransactions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:2rem">Nenhuma transação encontrada</td></tr>';
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:2rem">Nenhuma transação encontrada</td></tr>';
                 document.getElementById('pageInfo').textContent = '';
                 return;
             }
 
-            document.getElementById('pageInfo').textContent = `${start + 1}-${end} de ${allTransactions.length}`;
+            document.getElementById('pageInfo').textContent = `${start + 1}-${end} de ${filtered.length}`;
 
             page.forEach(t => {
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
@@ -639,6 +758,7 @@
                 const valueOrig = t.valueOriginal || t.value || 0;
                 const curr = t.currency || 'BRL';
                 const showOriginal = curr !== userCurrency && valueOrig;
+                const bankLabel = t.bank || '—';
                 tr.innerHTML = `
                     <td>${d.toLocaleDateString('pt-BR')}</td>
                     <td>${t.description || '—'}</td>
@@ -646,6 +766,7 @@
                     <td class="${t.type === 'entrada' ? 'positive' : 'negative'}">
                         ${t.type === 'entrada' ? '+' : '-'} ${formatValue(valueOrig, curr)}${showOriginal ? ` <span style="font-size:0.65rem;color:var(--text-dim)">(${parseFloat(valueOrig).toFixed(2)} ${curr})</span>` : ''}
                     </td>
+                    <td>${bankLabel !== '—' ? `<span class="bank-chip">${bankLabel}</span>` : '—'}</td>
                     <td><button class="delete-btn" onclick="deleteTransaction('${t.id}')">×</button></td>
                 `;
                 tbody.appendChild(tr);
@@ -664,18 +785,20 @@
             if (currentPage > 1) { currentPage--; updateTable(); }
         }
         function nextPage() {
-            if (currentPage * PAGE_SIZE < allTransactions.length) { currentPage++; updateTable(); }
+            const filtered = getFilteredTransactions();
+            if (currentPage * PAGE_SIZE < filtered.length) { currentPage++; updateTable(); }
         }
 
         // Exportar CSV
         function exportCSV() {
-            let csv = 'Data;Descrição;Valor;Tipo;Categoria;Moeda\n';
-            allTransactions.forEach(t => {
+            let csv = 'Data;Descrição;Valor;Tipo;Categoria;Moeda;Banco\n';
+            const filtered = getFilteredTransactions();
+            filtered.forEach(t => {
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
                 const dateStr = d.toLocaleDateString('pt-BR');
                 const desc = (t.description || '').replace(/"/g, '""');
                 const val = t.value || t.valueOriginal || 0;
-                csv += `${dateStr};"${desc}";${val};${t.type};${t.category || 'Outros'};${t.currency || 'BRL'}\n`;
+                csv += `${dateStr};"${desc}";${val};${t.type};${t.category || 'Outros'};${t.currency || 'BRL'};${t.bank || ''}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -743,6 +866,12 @@
                     pendingImport = iaResult;
                 }
 
+                // Aplica banco selecionado a todas as transações importadas
+                const importBank = document.getElementById('importBankSelect').value;
+                if (importBank) {
+                    pendingImport.forEach(t => t.bank = importBank);
+                }
+
                 // Mostra preview
                 const tbody = document.getElementById('previewBody');
                 tbody.innerHTML = '';
@@ -754,6 +883,7 @@
                         <td style="padding:0.4rem">R$ ${(t.value || 0).toFixed(2)}</td>
                         <td style="padding:0.4rem">${t.type || 'saida'}</td>
                         <td style="padding:0.4rem">${t.category || 'Outros'}</td>
+                        <td style="padding:0.4rem">${t.bank || '<span style="color:var(--text-dim)">—</span>'}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -953,7 +1083,8 @@
                         body: JSON.stringify({
                             model: 'protagnix',
                             messages: [
-                                { role: 'system', content: 'Você é um extrator de transações financeiras. Analise o texto (pode ser extrato bancário de qualquer banco brasileiro, em qualquer formato). Extraia TODAS as transações encontradas. Retorne APENAS um array JSON válido, sem markdown, sem explicação:\n[{"date":"DD/MM/YYYY","description":"descrição limpa da transação","value":0.00,"type":"entrada ou saida","category":"categoria"}]\n\nRegras:\n- date: data da transação no formato DD/MM/YYYY. Se não tiver ano, use 2026.\n- description: descrição limpa (sem CPF, CNPJ, números de conta, códigos). Máximo 200 chars.\n- value: valor numérico com ponto decimal (ex: 69.90, nao 69,90).\n- type: "entrada" se for recebimento/crédito, "saida" se for pagamento/débito.\n- category: uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.\n- Ignore linhas de saldo, cabeçalho, rodapé, totais.\n- Se não encontrar nenhuma transação, retorne [].' },
+                                { role: 'system', content: 'Você é um extrator de transações financeiras. Analise o texto (pode ser extrato bancário de qualquer banco brasileiro, em qualquer formato). Extraia TODAS as transações encontradas. Retorne APENAS um array JSON válido, sem markdown, sem explicação:\n[{"date":"DD/MM/YYYY","description":"descrição limpa da transação","value":0.00,"type":"entrada ou saida","category":"categoria"}]\n\nRegras:\n- date: data da transação no formato DD/MM/YYYY. Se não tiver ano, use 2026.\n- description: descrição limpa (sem CPF, CNPJ, números de conta, códigos). Máximo 200 chars.\n- value: valor numérico com ponto decimal (ex: 69.90, nao 69,90).\n- type: "entrada" se for recebimento/crédito, "saida" se for pagamento/débito.\n- category: uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.\n- Ignore linhas de saldo, cabeçalho, rodapé, totais.\n- Se não encontrar nenhuma transação, retorne [].
+- Se o texto mencionar o nome do banco, inclua como campo opcional "bank".' },
                                 { role: 'user', content: chunks[i] }
                             ]
                         })
@@ -1009,6 +1140,7 @@
                     value: parseFloat(t.value) || 0,
                     type: t.type || 'saida',
                     category: t.category || 'Outros',
+                    bank: t.bank || '',
                     source: 'import',
                     currency: t.currency || 'BRL',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1150,6 +1282,7 @@
 
                 // Moeda da transação — salva ORIGINAL, converte só na exibição
                 const moedaOrigem = document.getElementById('moedaSelect').value;
+                const banco = document.getElementById('bancoSelect').value || '';
 
                 const transaction = {
                     date: new Date(),
@@ -1158,6 +1291,7 @@
                     currency: moedaOrigem,
                     type: tipo,
                     category: category,
+                    bank: banco,
                     source: 'manual',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
