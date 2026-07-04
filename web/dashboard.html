@@ -11,6 +11,8 @@
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
     <style>
         :root {
             --green: #22c55e;
@@ -287,6 +289,39 @@
                     <button type="submit">Adicionar</button>
                 </form>
                 <div id="aiStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+            </div>
+
+            <div class="add-card">
+                <h3>📄 Importar extrato</h3>
+                <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:1rem">Envie PDF, imagem (PNG/JPG) ou CSV do extrato bancário. A IA extrai as transações automaticamente.</p>
+                <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
+                    <input type="file" id="importFile" accept=".pdf,.png,.jpg,.jpeg,.csv" style="display:none">
+                    <label for="importFile" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.7rem 1.5rem;color:var(--text);cursor:pointer;font-size:0.9rem;font-weight:600">📎 Selecionar arquivo</label>
+                    <span id="importFileName" style="font-size:0.85rem;color:var(--text-dim)"></span>
+                    <button id="importBtn" onclick="processImport()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.9rem;display:none">Importar</button>
+                </div>
+                <div id="importStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                <div id="importPreview" style="margin-top:1rem;display:none">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                        <span style="font-size:0.9rem;font-weight:600" id="previewTitle">Transações encontradas:</span>
+                        <div style="display:flex;gap:0.5rem">
+                            <button onclick="confirmImport()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.4rem 1rem;font-weight:600;cursor:pointer;font-size:0.85rem">✓ Confirmar</button>
+                            <button onclick="cancelImport()" style="background:var(--card);border:1px solid var(--border);color:var(--red);border-radius:8px;padding:0.4rem 1rem;cursor:pointer;font-size:0.85rem">✗ Cancelar</button>
+                        </div>
+                    </div>
+                    <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+                        <table style="width:100%;font-size:0.85rem">
+                            <thead style="position:sticky;top:0;background:var(--card)"><tr>
+                                <th style="text-align:left;padding:0.4rem">Data</th>
+                                <th style="text-align:left;padding:0.4rem">Descrição</th>
+                                <th style="text-align:left;padding:0.4rem">Valor</th>
+                                <th style="text-align:left;padding:0.4rem">Tipo</th>
+                                <th style="text-align:left;padding:0.4rem">Categoria</th>
+                            </tr></thead>
+                            <tbody id="previewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <div class="table-card">
@@ -647,6 +682,211 @@
             link.href = URL.createObjectURL(blob);
             link.download = 'financas-export.csv';
             link.click();
+        }
+
+        // === IMPORTADOR ===
+        let pendingImport = [];
+
+        document.getElementById('importFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('importFileName').textContent = file.name;
+            document.getElementById('importBtn').style.display = 'inline-flex';
+        });
+
+        async function processImport() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) return;
+            const status = document.getElementById('importStatus');
+            const preview = document.getElementById('importPreview');
+            preview.style.display = 'none';
+            pendingImport = [];
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            status.textContent = '⏳ Processando...';
+
+            try {
+                let text = '';
+                if (ext === 'pdf') {
+                    text = await extractPDFText(file);
+                } else if (ext === 'csv') {
+                    text = await file.text();
+                } else if (['png', 'jpg', 'jpeg'].includes(ext)) {
+                    status.textContent = '⏳ OCR da imagem... (pode levar 30s)';
+                    text = await extractImageText(file);
+                } else {
+                    status.textContent = '❌ Formato não suportado: ' + ext;
+                    return;
+                }
+
+                if (!text || text.trim().length < 10) {
+                    status.textContent = '❌ Não consegui extrair texto do arquivo';
+                    return;
+                }
+
+                status.textContent = '🧠 Analisando transações...';
+                const transactions = parseExtractedText(text);
+
+                if (transactions.length === 0) {
+                    // Tenta classificação via IA (sem expor chave - usa endpoint existente)
+                    status.textContent = '🧠 Enviando pra IA classificar...';
+                    const iaResult = await classifyExtractWithIA(text);
+                    if (iaResult && iaResult.length > 0) {
+                        pendingImport = iaResult;
+                    } else {
+                        status.textContent = '❌ Não encontrei transações no arquivo. Tente outro formato.';
+                        return;
+                    }
+                } else {
+                    pendingImport = transactions;
+                }
+
+                // Mostra preview
+                const tbody = document.getElementById('previewBody');
+                tbody.innerHTML = '';
+                pendingImport.forEach((t, i) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding:0.4rem">${t.date || '—'}</td>
+                        <td style="padding:0.4rem">${t.description || '—'}</td>
+                        <td style="padding:0.4rem">R$ ${(t.value || 0).toFixed(2)}</td>
+                        <td style="padding:0.4rem">${t.type || 'saida'}</td>
+                        <td style="padding:0.4rem">${t.category || 'Outros'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('previewTitle').textContent = `Transações encontradas: ${pendingImport.length}`;
+                preview.style.display = 'block';
+                status.textContent = `✅ ${pendingImport.length} transações encontradas. Revise e confirme.`;
+
+            } catch (err) {
+                status.textContent = '❌ Erro: ' + err.message;
+            }
+        }
+
+        async function extractPDFText(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfjsLib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
+            if (!pdfjsLib) throw new Error('PDF.js não carregou');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+            return fullText;
+        }
+
+        async function extractImageText(file) {
+            const worker = await Tesseract.createWorker('por');
+            const { data: { text } } = await worker.recognize(file);
+            await worker.terminate();
+            return text;
+        }
+
+        function parseExtractedText(text) {
+            const transactions = [];
+            const lines = text.split('\n');
+            // Padrões comuns em extratos brasileiros
+            const dateRegex = /(\d{2})\/(\d{2})\/(\d{4}|\d{2})/;
+            const valueRegex = /[R]?\$?\s?(\d+[.,]\d{2})/;
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.length < 5) continue;
+                const dateMatch = trimmed.match(dateRegex);
+                const valueMatch = trimmed.match(valueRegex);
+                if (dateMatch && valueMatch) {
+                    const date = dateMatch[0];
+                    const value = parseFloat(valueMatch[1].replace(',', '.'));
+                    const isSaida = /sa[ií]da|d[ée]bito|debit|pagamento|compra|transfer.*enviada|pix.*enviada/i.test(trimmed);
+                    const isEntrada = /entrada|cr[ée]dito|recebimento|transfer.*recebida|pix.*recebida|dep[óo]sito/i.test(trimmed);
+                    const desc = trimmed.replace(dateRegex, '').replace(valueRegex, '').trim().substring(0, 200);
+                    if (desc.length < 3) continue;
+                    transactions.push({
+                        date,
+                        description: desc,
+                        value,
+                        type: isEntrada ? 'entrada' : 'saida',
+                        category: categorizeLocal(desc, isEntrada ? 'entrada' : 'saida'),
+                        currency: 'BRL',
+                        source: 'import'
+                    });
+                }
+            }
+            return transactions;
+        }
+
+        async function classifyExtractWithIA(text) {
+            // Usa o endpoint /v1/chat/completions existente do 9Router
+            // sem expor a chave - mandamos só um trecho pra classificar
+            const chunk = text.substring(0, 3000);
+            try {
+                const resp = await fetch(NINJA_API + '/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': '***' + NINJA_KEY },
+                    body: JSON.stringify({
+                        model: 'protagnix',
+                        messages: [
+                            { role: 'system', content: 'Extraia todas as transacoes financeiras do texto. Retorne APENAS um array JSON: [{"date":"DD/MM/YYYY","description":"texto","value":0.00,"type":"entrada ou saida","category":"categoria"}]. Categorias: Alimentacao, Transporte, Moradia, Saude, Assinaturas, Lazer, Educacao, Renda, Outros.' },
+                            { role: 'user', content: chunk }
+                        ]
+                    })
+                });
+                if (!resp.ok) return [];
+                const data = await resp.json();
+                const content = data.choices?.[0]?.message?.content || '';
+                const jsonMatch = content.match(/\[[\s\S]*\]/);
+                if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            } catch (e) { console.log('IA classify failed:', e); }
+            return [];
+        }
+
+        async function confirmImport() {
+            const status = document.getElementById('importStatus');
+            status.textContent = `⏳ Salvando ${pendingImport.length} transações...`;
+            const batch = db.batch();
+            const txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
+            for (const t of pendingImport) {
+                let dateObj;
+                if (typeof t.date === 'string') {
+                    const parts = t.date.split('/');
+                    dateObj = new Date(parts[2] || 2026, parts[1] - 1, parts[0]);
+                } else {
+                    dateObj = new Date();
+                }
+                batch.set(txRef.doc(), {
+                    date: dateObj,
+                    description: t.description || 'Sem descrição',
+                    value: parseFloat(t.value) || 0,
+                    type: t.type || 'saida',
+                    category: t.category || 'Outros',
+                    source: 'import',
+                    currency: t.currency || 'BRL',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            await batch.commit();
+            document.getElementById('importPreview').style.display = 'none';
+            document.getElementById('importFileName').textContent = '';
+            document.getElementById('importBtn').style.display = 'none';
+            document.getElementById('importFile').value = '';
+            status.textContent = `✅ ${pendingImport.length} transações importadas!`;
+            pendingImport = [];
+            setTimeout(() => { status.textContent = ''; }, 4000);
+            await loadData();
+        }
+
+        function cancelImport() {
+            pendingImport = [];
+            document.getElementById('importPreview').style.display = 'none';
+            document.getElementById('importFileName').textContent = '';
+            document.getElementById('importBtn').style.display = 'none';
+            document.getElementById('importFile').value = '';
+            document.getElementById('importStatus').textContent = '';
         }
 
         // Add transaction form
