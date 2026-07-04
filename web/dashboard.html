@@ -959,8 +959,21 @@
                         })
                     });
                     if (!resp.ok) continue;
-                    const data = await resp.json();
-                    const content = data.choices?.[0]?.message?.content || '';
+                    // 9Router/GLM-5 pode retornar JSON malformado (extra data no final)
+                    // Então extraímos o content do raw text em vez de usar resp.json()
+                    const rawText = await resp.text();
+                    let content = '';
+                    try {
+                        const data = JSON.parse(rawText);
+                        content = data.choices?.[0]?.message?.content || '';
+                    } catch(e) {
+                        // Fallback: extrai content via regex do raw text
+                        const contentMatch = rawText.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        if (contentMatch) {
+                            content = contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                        }
+                    }
+                    if (!content) continue;
                     // Parser JSON robusto: encontra o array e extrai caractere por caractere
                     const parsed = safeParseJSONArray(content);
                     if (parsed && parsed.length > 0) allTransactions.push(...parsed);
@@ -1081,8 +1094,17 @@
                         })
                     });
                     if (aiResp.ok) {
-                        const aiData = await aiResp.json();
-                        const content = aiData.choices?.[0]?.message?.content || '';
+                        const aiRaw = await aiResp.text();
+                        let content = '';
+                        try {
+                            const aiData = JSON.parse(aiRaw);
+                            content = aiData.choices?.[0]?.message?.content || '';
+                        } catch(e) {
+                            const contentMatch = aiRaw.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                            if (contentMatch) {
+                                content = contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                            }
+                        }
                         // Extract JSON from response
                         const jsonMatch = content.match(/{[\s\S]*?}/);
                         if (jsonMatch) {
