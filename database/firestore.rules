@@ -12,8 +12,12 @@ service cloud.firestore {
         && request.resource.data.value is number
         && request.resource.data.value >= 0
         && request.resource.data.value <= 999999999.99
-        && request.resource.data.description.size() <= 500
-        && request.write.size < 10;
+        && request.resource.data.description.size() <= 500;
+      
+      allow update: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['description', 'value', 'type', 'category', 'currency']);
         // && get(/databases/$(database)/documents/users/$(userId)).data.usage.transactions < 50  (activate per plan)
       
       allow update: if request.auth != null 
