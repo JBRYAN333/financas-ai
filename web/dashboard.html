@@ -354,13 +354,24 @@
 
             const snapshot = await db.collection('users').doc(currentUser.uid)
                 .collection('transactions')
-                .orderBy('createdAt', 'desc')
-                .limit(100)
-                .get();
+                .orderBy('date', 'desc')
+                .get()
+                .catch(async () => {
+                    // Fallback: sem orderBy (se índice não existir)
+                    const s2 = await db.collection('users').doc(currentUser.uid)
+                        .collection('transactions').get();
+                    return s2;
+                });
 
             allTransactions = [];
             snapshot.forEach(doc => {
                 allTransactions.push({ id: doc.id, ...doc.data() });
+            });
+            // Sort by date descending (newest first)
+            allTransactions.sort((a, b) => {
+                const dateA = a.date?.toDate?.() || new Date(a.date || 0);
+                const dateB = b.date?.toDate?.() || new Date(b.date || 0);
+                return dateB - dateA;
             });
 
             document.getElementById('transactionsLoading').style.display = 'none';
