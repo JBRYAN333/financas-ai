@@ -388,7 +388,6 @@
                     <option value="3m">Últimos 3 meses</option>
                     <option value="6m">Últimos 6 meses</option>
                     <option value="12m">Últimos 12 meses</option>
-                    <option value="all">Tudo</option>
                     <option value="custom">Personalizado...</option>
                 </select>
                 <input type="date" id="dateFrom" onchange="applyPeriod()" style="padding:0.5rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem;display:none">
@@ -1802,7 +1801,7 @@
                 await db.collection('users').doc(currentUser.uid)
                     .collection('transactions').doc(id).update(updateData);
                 console.log('Edit salvo com sucesso');
-                // Atualiza em memória (NÃO recarrega loadData — evita bug com ad blocker)
+                // Atualiza APENAS os campos editados em memória (NÃO mexe em date)
                 const idx = allTransactions.findIndex(x => x.id === id);
                 if (idx >= 0) {
                     allTransactions[idx].description = desc;
@@ -1811,17 +1810,17 @@
                     allTransactions[idx].currency = currency;
                     allTransactions[idx].category = category;
                     allTransactions[idx].bank = bank;
-                    if (dateStr) allTransactions[idx].date = { toDate: () => dateObj };
+                    // NÃO atualiza date em memória — mantém o Timestamp original do Firestore
                 }
                 document.getElementById('editModal').remove();
-                // Limpa filtro de banco pra evitar que a transação suma da tabela
-                // (se o usuário mudou o banco, o filtro antigo cortaria a transação)
                 filterBank = '';
                 document.getElementById('filterBank').value = '';
                 currentPage = 1;
                 updateDashboard();
                 updateTable();
                 populateBankFilter();
+                // Tenta recarregar do Firestore em background (se ad blocker bloquear, dados em memória mantém)
+                try { await loadData(); } catch(e) { console.log('loadData após edit falhou (ad blocker?), usando em memória'); }
             } catch(e) {
                 console.error('saveEdit error:', e);
                 alert('Erro ao salvar: ' + e.message);
