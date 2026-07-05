@@ -481,8 +481,8 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        const NINJA_API = 'https://protagrouter.squareweb.app';
-        const NINJA_KEY = 'clawsec_ninja_2026';
+        // URL das Firebase Functions (proxy do 9Router com auth Firebase)
+        const FUNCTIONS_URL = 'https://us-central1-financas-ai-706d2.cloudfunctions.net';
 
         let currentUser = null;
         let allTransactions = [];
@@ -1240,36 +1240,15 @@
 
             for (let i = 0; i < chunks.length; i++) {
                 try {
-                    const resp = await fetch(NINJA_API + '/v1/chat/completions', {
+                    const idToken = await currentUser.getIdToken();
+                    const resp = await fetch(FUNCTIONS_URL + '/extract', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + NINJA_KEY },
-                        body: JSON.stringify({
-                            model: 'protagnix',
-                            messages: [
-                                { role: 'system', content: 'Você é um extrator de transações financeiras. Analise o texto (pode ser extrato bancário de qualquer banco brasileiro, em qualquer formato). Extraia TODAS as transações encontradas. Retorne APENAS um array JSON válido, sem markdown, sem explicação:\n[{"date":"DD/MM/YYYY","description":"descrição limpa da transação","value":0.00,"type":"entrada ou saida","category":"categoria"}]\n\nRegras:\n- date: data da transação no formato DD/MM/YYYY. Se não tiver ano, use 2026.\n- description: descrição limpa (sem CPF, CNPJ, números de conta, códigos). Máximo 200 chars.\n- value: valor numérico com ponto decimal (ex: 69.90, nao 69,90).\n- type: "entrada" se for recebimento/crédito, "saida" se for pagamento/débito.\n- category: uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.\n- Ignore linhas de saldo, cabeçalho, rodapé, totais.\n- Se não encontrar nenhuma transação, retorne [].\n- Se o texto mencionar o nome do banco, inclua como campo opcional "bank".' },
-                                { role: 'user', content: chunks[i] }
-                            ]
-                        })
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                        body: JSON.stringify({ text: chunks[i] })
                     });
                     if (!resp.ok) continue;
-                    // 9Router/GLM-5 pode retornar JSON malformado (extra data no final)
-                    // Então extraímos o content do raw text em vez de usar resp.json()
-                    const rawText = await resp.text();
-                    let content = '';
-                    try {
-                        const data = JSON.parse(rawText);
-                        content = data.choices?.[0]?.message?.content || '';
-                    } catch(e) {
-                        // Fallback: extrai content via regex do raw text
-                        const contentMatch = rawText.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        if (contentMatch) {
-                            content = contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-                        }
-                    }
-                    if (!content) continue;
-                    // Parser JSON robusto: encontra o array e extrai caractere por caractere
-                    const parsed = safeParseJSONArray(content);
-                    if (parsed && parsed.length > 0) allTransactions.push(...parsed);
+                    const data = await resp.json();
+                    if (data.transactions && data.transactions.length > 0) allTransactions.push(...data.transactions);
                 } catch (e) { console.log('IA chunk failed:', e); }
             }
 
@@ -1365,57 +1344,30 @@
                 let category = null;
                 let valorDetectado = valor ? parseFloat(valor) : null;
 
-                // Try 9Router AI classification via /v1/chat/completions
+                // Try Firebase Function (proxy do 9Router com auth)
                 try {
-                    const aiResp = await fetch(NINJA_API + '/v1/chat/completions', {
+                    const idToken = await currentUser.getIdToken();
+                    const aiResp = await fetch(FUNCTIONS_URL + '/classify', {
                         method: 'POST',
                         headers: { 
                             'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + NINJA_KEY
+                            'Authorization': 'Bearer ' + idToken
                         },
-                        body: JSON.stringify({
-                            model: 'protagnix',
-                            messages: [
-                                {
-                                    role: 'system',
-                                    content: 'Classifique a transacao financeira. Retorne APENAS JSON valido com: descricao, valor (numero sem R$), tipo (entrada/saida), categoria, confianca. Categorias: Alimentacao, Transporte, Moradia, Saude, Assinaturas, Lazer, Educacao, Renda, Outros.'
-                                },
-                                {
-                                    role: 'user',
-                                    content: desc
-                                }
-                            ]
-                        })
+                        body: JSON.stringify({ description: desc })
                     });
                     if (aiResp.ok) {
-                        const aiRaw = await aiResp.text();
-                        let content = '';
-                        try {
-                            const aiData = JSON.parse(aiRaw);
-                            content = aiData.choices?.[0]?.message?.content || '';
-                        } catch(e) {
-                            const contentMatch = aiRaw.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                            if (contentMatch) {
-                                content = contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                        const aiData = await aiResp.json();
+                        const result = aiData.result;
+                        if (result) {
+                            category = result.categoria || null;
+                            if (!valorDetectado && result.valor) {
+                                valorDetectado = parseFloat(result.valor);
                             }
-                        }
-                        // Extract JSON from response
-                        const jsonMatch = content.match(/{[\s\S]*?}/);
-                        if (jsonMatch) {
-                            try {
-                                const parsed = JSON.parse(jsonMatch[0]);
-                                category = parsed.categoria || null;
-                                if (!valorDetectado && parsed.valor) {
-                                    valorDetectado = parseFloat(parsed.valor);
-                                }
-                                status.textContent = '✨ Classificado por IA';
-                            } catch(e) {
-                                console.log('Erro parse JSON da IA');
-                            }
+                            status.textContent = '✨ Classificado por IA';
                         }
                     }
                 } catch (e) {
-                    console.log('9Router indisponivel, fallback local', e);
+                    console.log('Function indisponivel, fallback local', e);
                 }
 
                 // Fallback local se IA não responder

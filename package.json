@@ -1,0 +1,9 @@
+{
+  "name": "financas-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Financas AI — SaaS financeiro para microempreendedores",
+  "scripts": {
+    "deploy:functions": "cd functions && npm install && npx firebase deploy --only functions"
+  }
+}
