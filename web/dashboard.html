@@ -692,52 +692,42 @@
             document.getElementById('monthLabel').textContent = `Visão geral de ${getPeriodLabel()}${filterLabel}`;
 
             const filtered = getFilteredTransactions();
-            const monthTx = filtered.filter(t => {
-                if (!t.date) return false;
-                const d = t.date.toDate ? t.date.toDate() : new Date(t.date);
-                return d.getMonth() === month && d.getFullYear() === year;
-            });
 
             let entradas = 0, saidas = 0;
             let saldo = 0;
             let categories = {};
 
-            // Helper: converte valor pra moeda principal do usuário e soma
-            const sumConverted = (t, isEntrada) => {
-                const v = parseFloat(t.valueOriginal || t.value || 0);
-                const c = t.currency || 'BRL';
-                const converted = convert(v, c, userCurrency);
-                if (isEntrada) saldo += converted;
-                else saldo -= converted;
-            };
-
-            // Calculate balance from filtered transactions in order
+            // Calculate balance and stats from filtered transactions
             const ordered = [...filtered].reverse();
             ordered.forEach(t => {
-                if (t.type === 'entrada') sumConverted(t, true);
-                else sumConverted(t, false);
-            });
-
-            monthTx.forEach(t => {
                 const v = parseFloat(t.valueOriginal || t.value || 0);
                 const c = t.currency || 'BRL';
                 const converted = convert(v, c, userCurrency);
                 
-                if (t.type === 'entrada') entradas += converted;
-                else saidas += converted;
-
-                const cat = t.category || 'Outros';
-                if (t.type === 'saida') {
+                if (t.type === 'entrada') {
+                    saldo += converted;
+                    entradas += converted;
+                } else {
+                    saldo -= converted;
+                    saidas += converted;
+                    const cat = t.category || 'Outros';
                     categories[cat] = (categories[cat] || 0) + converted;
                 }
             });
+
+            // Count current month transactions for the sub label
+            const monthCount = filtered.filter(t => {
+                if (!t.date) return false;
+                const d = t.date.toDate ? t.date.toDate() : new Date(t.date);
+                return d.getMonth() === month && d.getFullYear() === year;
+            }).length;
 
             document.getElementById('saldo').textContent = formatValue(saldo);
             document.getElementById('saldo').className = 'value ' + (saldo >= 0 ? 'positive' : 'negative');
             document.getElementById('entradas').textContent = formatValue(entradas);
             document.getElementById('saidas').textContent = formatValue(saidas);
             document.getElementById('totalTransacoes').textContent = filtered.length;
-            document.getElementById('monthTransacoes').textContent = monthTx.length + ' este mês';
+            document.getElementById('monthTransacoes').textContent = monthCount + ' este mês';
             document.getElementById('transCount').textContent = `(${filtered.length})`;
 
             // Charts
