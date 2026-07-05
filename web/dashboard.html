@@ -779,9 +779,9 @@
                 case '12m':
                     return { from: new Date(y - 1, m, 1), to: now };
                 case 'all':
-                    return { from: new Date(2000, 0, 1), to: now };
+                    return { from: new Date(0), to: now };
                 case 'custom':
-                    return { from: customFrom || new Date(2000, 0, 1), to: customTo || now };
+                    return { from: customFrom || new Date(0), to: customTo || now };
                 default:
                     return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0, 23, 59, 59) };
             }
@@ -820,6 +820,15 @@
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
                 if (d < range.from || d > range.to) return false;
                 return true;
+            });
+        }
+
+        // Debug: log transactions pra entender o que ta acontecendo
+        function debugTransactions() {
+            console.log('Total transações em memória:', allTransactions.length);
+            allTransactions.slice(0, 5).forEach((t, i) => {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                console.log(`  [${i}] date:`, t.date, '→ parsed:', d.toISOString(), 'desc:', t.description);
             });
         }
 
