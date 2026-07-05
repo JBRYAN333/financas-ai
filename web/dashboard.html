@@ -1581,6 +1581,36 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     await batch.commit();
+                    // Adiciona em memória (não depende de loadData que pode falhar com ad blocker)
+                    const now = new Date();
+                    allTransactions.unshift({
+                        id: 'tf_out_' + transferId,
+                        date: { toDate: () => now },
+                        description: `Transferência → ${toBank}`,
+                        value: valorDetectado || 0,
+                        currency: moedaOrigem,
+                        type: 'transferencia',
+                        category: 'Transferência',
+                        bank: fromBank,
+                        fromBank: fromBank,
+                        toBank: toBank,
+                        transferId: transferId,
+                        source: 'manual'
+                    });
+                    allTransactions.unshift({
+                        id: 'tf_in_' + transferId,
+                        date: { toDate: () => now },
+                        description: `Transferência ← ${fromBank}`,
+                        value: valorDetectado || 0,
+                        currency: moedaOrigem,
+                        type: 'transferencia',
+                        category: 'Transferência',
+                        bank: toBank,
+                        fromBank: fromBank,
+                        toBank: toBank,
+                        transferId: transferId,
+                        source: 'manual'
+                    });
                 } else {
                     const transaction = {
                         date: new Date(),
@@ -1594,15 +1624,31 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
 
-                    await db.collection('users').doc(currentUser.uid)
+                    const docRef = await db.collection('users').doc(currentUser.uid)
                         .collection('transactions').add(transaction);
+                    // Adiciona em memória também (fallback pra ad blocker)
+                    allTransactions.unshift({
+                        id: docRef.id,
+                        date: { toDate: () => new Date() },
+                        description: desc,
+                        value: valorDetectado || 0,
+                        currency: moedaOrigem,
+                        type: tipo,
+                        category: category,
+                        bank: banco,
+                        source: 'manual'
+                    });
                 }
 
                 document.getElementById('descInput').value = '';
                 document.getElementById('valorInput').value = '';
                 status.textContent = 'Adicionado! (' + moedaOrigem + ')';
                 setTimeout(() => { status.textContent = ''; }, 3000);
-                await loadData();
+                // Atualiza UI com dados em memória (loadData pode falhar com ad blocker)
+                try { await loadData(); } catch(e) { console.log('loadData fallback'); }
+                updateDashboard();
+                updateTable();
+                populateBankFilter();
 
             } catch (err) {
                 status.textContent = 'Erro: ' + err.message;
