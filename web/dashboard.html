@@ -214,9 +214,59 @@
             opacity: 0.5;
         }
         .delete-btn:hover { opacity: 1; }
+        .edit-btn {
+            background: none;
+            border: none;
+            color: var(--blue);
+            cursor: pointer;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+        .edit-btn:hover { opacity: 1; }
+
+        /* Edit modal */
+        .edit-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999;
+            display: flex; align-items: center; justify-content: center; padding: 1rem;
+        }
+        .edit-modal .card {
+            background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+            padding: 2rem; max-width: 460px; width: 100%;
+        }
+        .edit-modal input, .edit-modal select {
+            width: 100%; padding: 0.7rem 1rem; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.9rem; margin-bottom: 0.8rem;
+        }
+        .edit-modal input:focus, .edit-modal select:focus { outline: none; border-color: var(--green); }
+        .edit-modal label { display: block; margin-bottom: 0.3rem; color: var(--text-dim); font-size: 0.8rem; }
+        .edit-modal .btn-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+        .edit-modal .btn-row button { flex: 1; padding: 0.7rem; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 600; }
+        .edit-modal .save-btn { background: var(--green); color: #052e16; border: none; }
+        .edit-modal .cancel-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); }
 
         /* Loading */
         .loading { text-align: center; padding: 3rem; color: var(--text-dim); }
+
+        /* Collapsible banks */
+        .banks-toggle {
+            display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;
+            cursor: pointer; color: var(--text-dim); font-size: 0.7rem;
+            text-transform: uppercase; letter-spacing: 0.05em; user-select: none;
+            transition: color 0.15s;
+        }
+        .banks-toggle:hover { color: var(--text); }
+        .banks-toggle .arrow { transition: transform 0.2s; font-size: 0.6rem; }
+        .banks-toggle .arrow.open { transform: rotate(90deg); }
+        .banks-content { display: none; flex-direction: column; gap: 0.2rem; }
+        .banks-content.open { display: flex; }
+
+        /* Bank icon */
+        .bank-icon { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; flex-shrink: 0; }
+        .bank-icon-placeholder { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0; }
+
+        /* Transfer form */
+        .transfer-row { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); }
+        .transfer-row select, .transfer-row input { flex: 1; min-width: 120px; }
 
         /* Mobile top bar (hidden on desktop) */
         .mobile-topbar {
@@ -314,8 +364,11 @@
             </div>
             <a href="#" class="active" style="gap:0"><span>Dashboard</span></a>
             <a href="index.html" style="gap:0"><span>Início</span></a>
-            <div class="banks-label" style="padding:0.7rem 1rem 0;margin-top:1rem;font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em">Bancos</div>
-            <div id="bankList" style="display:flex;flex-direction:column;gap:0.2rem"></div>
+            <div class="banks-toggle" id="banksToggle" onclick="toggleBanks()">
+                <span class="arrow" id="banksArrow">▶</span>
+                <span>Bancos <span id="bankCount" style="font-size:0.65rem;color:var(--text-dim)">(0)</span></span>
+            </div>
+            <div class="banks-content" id="bankList"></div>
             <div class="user-info">
                 <div style="color:var(--text);font-weight:500" id="userName">—</div>
                 <div class="email" id="userEmail">—</div>
@@ -381,13 +434,20 @@
                 <h3>➕ Nova transação</h3>
                 <form class="add-form" id="addForm">
                     <input type="text" id="descInput" placeholder='Ex: "Comprei pão no mercado R$ 35,90"' required>
-                    <select id="tipoSelect">
+                    <select id="tipoSelect" onchange="toggleTransferFields()">
                         <option value="saida">💸 Saída</option>
                         <option value="entrada">Entrada</option>
+                        <option value="transferencia">🔄 Transferência</option>
                     </select>
-                    <select id="bancoSelect" style="min-width:140px;flex:0.5">
-                        <option value="">— Banco —</option>
-                    </select>
+                    <div id="transferFields" style="display:none;width:100%">
+                        <div class="transfer-row">
+                            <select id="transferFrom" style="min-width:120px;flex:1"></select>
+                            <span style="display:flex;align-items:center;color:var(--text-dim)">→</span>
+                            <select id="transferTo" style="min-width:120px;flex:1"></select>
+                        </div>
+                    </div>
+                    <input type="text" id="bancoSelect" list="bankDatalist" placeholder="— Banco —" style="min-width:140px;flex:0.5" autocomplete="off">
+                    <datalist id="bankDatalist"></datalist>
                     <select id="moedaSelect" style="min-width:100px;flex:0.3">
                         <option value="BRL">BRL R$</option>
                         <option value="USD">USD $</option>
@@ -456,7 +516,7 @@
                     </div>
                     <table>
                         <thead><tr>
-                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th></th>
+                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th style="width:60px"></th>
                         </tr></thead>
                         <tbody id="transactionsBody"></tbody>
                     </table>
@@ -489,33 +549,72 @@
         let chartLinha = null;
         let chartPizza = null;
 
-        // Lista de bancos (nacionais + internacionais)
+        // Lista completa de bancos — Brasil + principais internacionais
         const BANKS = [
-            'Cora', 'Nubank', 'Itaú', 'Bradesco', 'Caixa', 'Santander', 'Inter', 'C6 Bank',
-            'BS2', 'BMG', 'Sofisa', 'Neon', 'PagBank', 'Mercado Pago', 'PicPay', 'Stone',
-            'Limite um', 'BTG Pactual', 'Iti', 'Brasilbank', 'Votorantim', 'Original',
-            'Modal', 'Sicusso', 'XP Investimentos', 'AgZero', 'Jurímé', 'Fazaña',
-            'Nubank EUA', 'Wise', 'PayPal', 'Revolut', 'Cash App', 'Chime', 'Ally Bank',
-            'Chase', 'Bank of America', 'Wells Fargo', 'Capital One', 'HSBC',
-            'N26', 'Monzo', 'Revolut EUA', ' bunq', 'Klarna',
+            // Bancos digitais e tradicionais BR
+            'Banco do Brasil', 'Bradesco', 'Itaú', 'Caixa Econômica Federal', 'Santander',
+            'Nubank', 'C6 Bank', 'Inter', 'PagBank', 'PicPay', 'Mercado Pago', 'Neon',
+            'Stone', 'BPBox Digital', 'Cora', 'BS2', 'BMG', 'Sofisa', 'Sicredi', 'Sicoob',
+            'Unicred', 'BTG Pactual', 'Iti', 'Original', 'Modal', 'XP Investimentos',
+            'AgZero', 'Brasilbank', 'Votorantim', 'Limite um', 'Sicusso', 'Jurímé',
+            'Fazaña', 'Digio', 'Next', 'Agibank', 'Banco Pan', 'Will Bank', 'Superdigital',
+            'Banco BV', 'Banco ItaúCard', 'Oney', 'Z-ro Bank', 'ReAGI', 'Trinus',
+            'Money Plus', 'Iugu', 'Sousa Guerra', 'Bexs', 'Conductor', 'Crediserra',
+            'Cooperativa de Crédito', 'Banco da Amazônia', 'Banco do Nordeste',
+            'Banco da Caixa', 'Banrisul', 'Bancoob', 'BRB', 'Citibank', 'HSBC',
+            // Internacionais
+            'Wise', 'PayPal', 'Revolut', 'Cash App', 'Chime', 'Ally Bank',
+            'Chase', 'Bank of America', 'Wells Fargo', 'Capital One',
+            'N26', 'Monzo', 'bunq', 'Klarna', 'Nubank EUA', 'Revolut EUA',
             'MercadoLibre', 'DolarApp', 'Belvo', 'Bitso', 'Lemon Cash',
             'Brubank', 'Personal Pay', 'Uala', 'Naranja X',
-            ' Banco de Bogotá', 'Bancolombia', 'Davivienda',
+            'Banco de Bogotá', 'Bancolombia', 'Davivienda',
+            // Genéricos
             'Carteira', 'Dinheiro', 'Outro'
         ].sort();
 
-        // Popular select de bancos
+        // Mapeamento de ícones (SimpleIcons CDN — grátis)
+        const BANK_ICONS = {
+            'Nubank': 'nubank', 'Itaú': 'itau', 'Bradesco': 'bradesco',
+            'Caixa Econômica Federal': 'caixa', 'Santander': 'santander',
+            'C6 Bank': 'c6bank', 'Inter': 'bancointer', 'PicPay': 'picpay',
+            'Stone': 'stoneco', 'BTG Pactual': 'btgpactual',
+            'Mercado Pago': 'mercadopago', 'N26': 'n26', 'Monzo': 'monzo',
+            'Revolut': 'revolut', 'Klarna': 'klarna', 'PayPal': 'paypal',
+            'Wise': 'wise', 'Chime': 'chime', 'HSBC': 'hsbc',
+            'Banco do Brasil': 'bancodobrasil', 'Bitso': 'bitso'
+        };
+
+        function getBankIcon(bank) {
+            const slug = BANK_ICONS[bank];
+            if (slug) {
+                return `<img class="bank-icon" src="https://cdn.simpleicons.org/${slug}/94a3b8" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="bank-icon-placeholder" style="display:none">🏦</span>`;
+            }
+            return '<span class="bank-icon-placeholder">🏦</span>';
+        }
+
+        // Popular datalist de bancos (autocomplete) e selects
         function populateBanks() {
             try {
-                const select = document.getElementById('bancoSelect');
+                // Datalist para autocomplete
+                const datalist = document.getElementById('bankDatalist');
                 const importSelect = document.getElementById('importBankSelect');
+                const transferFrom = document.getElementById('transferFrom');
+                const transferTo = document.getElementById('transferTo');
+
                 BANKS.forEach(bank => {
                     const opt = document.createElement('option');
                     opt.value = bank;
-                    opt.textContent = bank;
-                    select.appendChild(opt);
+                    datalist.appendChild(opt);
+
                     const opt2 = opt.cloneNode(true);
                     importSelect.appendChild(opt2);
+
+                    const opt3 = opt.cloneNode(true);
+                    transferFrom.appendChild(opt3);
+
+                    const opt4 = opt.cloneNode(true);
+                    transferTo.appendChild(opt4);
                 });
             } catch(e) { console.log('populateBanks error:', e); }
         }
@@ -594,8 +693,10 @@
 
         function updateBankList() {
             const container = document.getElementById('bankList');
+            const countEl = document.getElementById('bankCount');
             if (!container) return;
             const banks = [...new Set(allTransactions.map(t => t.bank).filter(Boolean))].sort();
+            if (countEl) countEl.textContent = `(${banks.length})`;
             if (banks.length === 0) {
                 container.innerHTML = '<div style="font-size:0.8rem;padding:0.5rem 1rem;color:var(--text-dim)">Nenhum banco ainda</div>';
                 return;
@@ -608,13 +709,17 @@
                     const v = parseFloat(t.valueOriginal || t.value || 0);
                     const c = t.currency || 'BRL';
                     if (t.type === 'entrada') saldo += convert(v, c, userCurrency);
-                    else saldo -= convert(v, c, userCurrency);
+                    else if (t.type === 'transferencia') {
+                        // Se esse banco é a origem (fromBank), sai dinheiro; se é destino (toBank), entra
+                        if (t.fromBank === bank) saldo -= convert(v, c, userCurrency);
+                        else if (t.toBank === bank) saldo += convert(v, c, userCurrency);
+                    } else saldo -= convert(v, c, userCurrency);
                 });
                 const isActive = filterBank === bank;
                 const a = document.createElement('a');
                 a.href = '#';
-                a.style.cssText = `padding:0.5rem 1rem;font-size:0.82rem;cursor:pointer;${isActive ? 'background:rgba(34,197,94,0.1);color:var(--text);border-left:3px solid var(--green)' : ''}`;
-                a.innerHTML = `<span>${bank}</span><span style="margin-left:auto;font-size:0.75rem;color:${saldo >= 0 ? 'var(--green)' : 'var(--red)'}">${formatValue(Math.abs(saldo))}</span>`;
+                a.style.cssText = `padding:0.5rem 1rem;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;${isActive ? 'background:rgba(34,197,94,0.1);color:var(--text);border-left:3px solid var(--green)' : ''}`;
+                a.innerHTML = `${getBankIcon(bank)}<span>${bank}</span><span style="margin-left:auto;font-size:0.75rem;color:${saldo >= 0 ? 'var(--green)' : 'var(--red)'}">${formatValue(Math.abs(saldo))}</span>`;
                 a.onclick = (e) => { e.preventDefault(); filterBank = isActive ? '' : bank; document.getElementById('filterBank').value = filterBank; updateDashboard(); updateTable(); populateBankFilter(); };
                 container.appendChild(a);
             });
@@ -625,6 +730,29 @@
             const ov = document.getElementById('sidebarOverlay');
             sb.classList.toggle('open');
             ov.classList.toggle('show');
+        }
+
+        // Toggle banks accordion
+        function toggleBanks() {
+            const content = document.getElementById('bankList');
+            const arrow = document.getElementById('banksArrow');
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        // Toggle transfer fields
+        function toggleTransferFields() {
+            const tipo = document.getElementById('tipoSelect').value;
+            const transferFields = document.getElementById('transferFields');
+            const bancoSelect = document.getElementById('bancoSelect');
+            if (tipo === 'transferencia') {
+                transferFields.style.display = 'block';
+                bancoSelect.selectedIndex = 0;
+                bancoSelect.style.opacity = '0.4';
+            } else {
+                transferFields.style.display = 'none';
+                bancoSelect.style.opacity = '1';
+            }
         }
 
         let filterBank = '';
@@ -718,30 +846,45 @@
         let currentPage = 1;
         const PAGE_SIZE = 30;
 
-        // Fetch latest rates with fallback chain + regional currencies
+        // Fetch latest rates — fontes mais confiáveis (todas grátis)
+        let ratesLastUpdate = null;
         async function fetchRates() {
             const sources = [
-                'https://open.er-api.com/v6/latest/USD',
-                'https://api.exchangerate-api.com/v4/latest/USD'
+                { url: 'https://api.exchangerate-api.com/v4/latest/USD', path: 'rates' },
+                { url: 'https://open.er-api.com/v6/latest/USD', path: 'rates' },
+                { url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json', path: 'usd' }
             ];
-            for (const url of sources) {
+            for (const src of sources) {
                 try {
-                    const res = await fetch(url);
+                    const res = await fetch(src.url);
                     const data = await res.json();
-                    if (data.rates) {
-                        rates = data.rates;
-                        rates.USD = 1;
-                        if (!rates.ARS) rates.ARS = 850;
-                        if (!rates.UYU) rates.UYU = 38;
-                        if (!rates.PYG) rates.PYG = 7300;
-                        if (!rates.PEN) rates.PEN = 3.7;
-                        if (!rates.BRL) rates.BRL = 5;
-                        return;
+                    let rawRates = data[src.path];
+                    if (!rawRates) continue;
+                    // Normaliza: a CDN usa chaves em minúsculo (brl, usd, etc)
+                    if (src.path === 'usd') {
+                        const normalized = {};
+                        for (const [k, v] of Object.entries(rawRates)) {
+                            normalized[k.toUpperCase()] = v;
+                        }
+                        rates = normalized;
+                    } else {
+                        rates = rawRates;
                     }
+                    rates.USD = 1;
+                    // Garante moedas regionais
+                    if (!rates.ARS) rates.ARS = 850;
+                    if (!rates.UYU) rates.UYU = 38;
+                    if (!rates.PYG) rates.PYG = 7300;
+                    if (!rates.PEN) rates.PEN = 3.7;
+                    if (!rates.BRL) rates.BRL = 5;
+                    ratesLastUpdate = new Date();
+                    console.log('Câmbio atualizado:', ratesLastUpdate.toISOString());
+                    return;
                 } catch(e) { console.log('Rate source failed:', e.message); }
             }
             // Hardcoded fallback if all APIs fail
             rates = { USD: 1, BRL: 5, EUR: 0.92, ARS: 850, UYU: 38, PYG: 7300, PEN: 3.7, GBP: 0.79, JPY: 149 };
+            ratesLastUpdate = new Date();
         }
 
         // Convert value from currency A to B using BRL as base
@@ -789,6 +932,9 @@
                 if (t.type === 'entrada') {
                     saldo += converted;
                     entradas += converted;
+                } else if (t.type === 'transferencia') {
+                    // Transferência não conta como entrada nem saída
+                    // Apenas ajusta saldo se a moeda for diferente (taxa)
                 } else {
                     saldo -= converted;
                     saidas += converted;
@@ -829,6 +975,7 @@
                 const v = parseFloat(t.valueOriginal || t.value || 0);
                 const c = t.currency || 'BRL';
                 if (t.type === 'entrada') runningBalance += convert(v, c, userCurrency);
+                else if (t.type === 'transferencia') { /* neutro */ }
                 else runningBalance -= convert(v, c, userCurrency);
                 
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
@@ -922,15 +1069,20 @@
                 const curr = t.currency || 'BRL';
                 const showOriginal = curr !== userCurrency && valueOrig;
                 const bankLabel = t.bank || '—';
+                const typeIcon = t.type === 'entrada' ? '+' : (t.type === 'transferencia' ? '⇄' : '-');
+                const typeClass = t.type === 'entrada' ? 'positive' : (t.type === 'transferencia' ? '' : 'negative');
                 tr.innerHTML = `
                     <td>${d.toLocaleDateString('pt-BR')}</td>
                     <td>${t.description || '—'}</td>
                     <td><span class="category-badge">${catLabel}</span></td>
-                    <td class="${t.type === 'entrada' ? 'positive' : 'negative'}">
-                        ${t.type === 'entrada' ? '+' : '-'} ${formatValue(valueOrig, curr)}${showOriginal ? ` <span style="font-size:0.65rem;color:var(--text-dim)">(${parseFloat(valueOrig).toFixed(2)} ${curr})</span>` : ''}
+                    <td class="${typeClass}">
+                        ${typeIcon} ${formatValue(valueOrig, curr)}${showOriginal ? ` <span style="font-size:0.65rem;color:var(--text-dim)">(${parseFloat(valueOrig).toFixed(2)} ${curr})</span>` : ''}
                     </td>
                     <td>${bankLabel !== '—' ? `<span class="bank-chip">${bankLabel}</span>` : '—'}</td>
-                    <td><button class="delete-btn" onclick="deleteTransaction('${t.id}')">×</button></td>
+                    <td style="display:flex;gap:0.3rem;align-items:center">
+                        <button class="edit-btn" onclick="editTransaction('${t.id}')">✎</button>
+                        <button class="delete-btn" onclick="deleteTransaction('${t.id}')">×</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1397,21 +1549,63 @@
                 // Moeda da transação — salva ORIGINAL, converte só na exibição
                 const moedaOrigem = document.getElementById('moedaSelect').value;
                 const banco = document.getElementById('bancoSelect').value || '';
+                const txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
 
-                const transaction = {
-                    date: new Date(),
-                    description: desc,
-                    value: valorDetectado || 0,
-                    currency: moedaOrigem,
-                    type: tipo,
-                    category: category,
-                    bank: banco,
-                    source: 'manual',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
+                if (tipo === 'transferencia') {
+                    const fromBank = document.getElementById('transferFrom').value;
+                    const toBank = document.getElementById('transferTo').value;
+                    if (!fromBank || !toBank) {
+                        status.textContent = '⚠ Selecione origem e destino da transferência';
+                        return;
+                    }
+                    const transferId = 'tf_' + Date.now();
+                    // Cria duastransações: saída da origem e entrada no destino
+                    const batch = db.batch();
+                    batch.set(txRef.doc(), {
+                        date: new Date(),
+                        description: `Transferência → ${toBank}`,
+                        value: valorDetectado || 0,
+                        currency: moedaOrigem,
+                        type: 'transferencia',
+                        category: 'Transferência',
+                        bank: fromBank,
+                        fromBank: fromBank,
+                        toBank: toBank,
+                        transferId: transferId,
+                        source: 'manual',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    batch.set(txRef.doc(), {
+                        date: new Date(),
+                        description: `Transferência ← ${fromBank}`,
+                        value: valorDetectado || 0,
+                        currency: moedaOrigem,
+                        type: 'transferencia',
+                        category: 'Transferência',
+                        bank: toBank,
+                        fromBank: fromBank,
+                        toBank: toBank,
+                        transferId: transferId,
+                        source: 'manual',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await batch.commit();
+                } else {
+                    const transaction = {
+                        date: new Date(),
+                        description: desc,
+                        value: valorDetectado || 0,
+                        currency: moedaOrigem,
+                        type: tipo,
+                        category: category,
+                        bank: banco,
+                        source: 'manual',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
 
-                await db.collection('users').doc(currentUser.uid)
-                    .collection('transactions').add(transaction);
+                    await db.collection('users').doc(currentUser.uid)
+                        .collection('transactions').add(transaction);
+                }
 
                 document.getElementById('descInput').value = '';
                 document.getElementById('valorInput').value = '';
@@ -1534,7 +1728,97 @@
                 return 'R$ ' + value.toFixed(2).replace('.', ',');
             }
         }
-    </script>
+
+        // Edit transaction modal
+        function editTransaction(id) {
+            const t = allTransactions.find(x => x.id === id);
+            if (!t) return;
+
+            // Remove modal existente se houver
+            const existing = document.getElementById('editModal');
+            if (existing) existing.remove();
+
+            const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
+            const dateStr = d.toISOString().split('T')[0];
+
+            const div = document.createElement('div');
+            div.id = 'editModal';
+            div.className = 'edit-modal';
+            div.innerHTML = `
+                <div class="card">
+                    <h3 style="margin-bottom:1.5rem">✎ Editar transação</h3>
+                    <label>Descrição</label>
+                    <input type="text" id="editDesc" value="${(t.description || '').replace(/"/g, '&quot;')}">
+                    <label>Valor</label>
+                    <input type="number" id="editValue" step="0.01" value="${t.value || t.valueOriginal || 0}">
+                    <div style="display:flex;gap:0.7rem">
+                        <div style="flex:1">
+                            <label>Tipo</label>
+                            <select id="editType">
+                                <option value="saida" ${t.type === 'saida' ? 'selected' : ''}>💸 Saída</option>
+                                <option value="entrada" ${t.type === 'entrada' ? 'selected' : ''}>Entrada</option>
+                                <option value="transferencia" ${t.type === 'transferencia' ? 'selected' : ''}>🔄 Transferência</option>
+                            </select>
+                        </div>
+                        <div style="flex:1">
+                            <label>Moeda</label>
+                            <select id="editCurrency">
+                                ${['BRL','USD','EUR','ARS','UYU','PYG','PEN','GBP','JPY'].map(c => `<option value="${c}" ${t.currency === c ? 'selected' : ''}>${c}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <label>Data</label>
+                    <input type="date" id="editDate" value="${dateStr}">
+                    <label>Categoria</label>
+                    <select id="editCategory">
+                        ${['Alimentação','Transporte','Moradia','Saúde','Assinaturas','Educação','Lazer','Renda','Outros','Transferência'].map(c => `<option value="${c}" ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                    <label>Banco</label>
+                    <input type="text" id="editBank" list="bankListData" value="${t.bank || ''}">
+                    <datalist id="bankListData">
+                        ${BANKS.map(b => `<option value="${b}">`).join('')}
+                    </datalist>
+                    <div class="btn-row">
+                        <button class="save-btn" onclick="saveEdit('${id}')">Salvar</button>
+                        <button class="cancel-btn" onclick="document.getElementById('editModal').remove()">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(div);
+        }
+
+        async function saveEdit(id) {
+            const t = allTransactions.find(x => x.id === id);
+            if (!t) return;
+            const desc = document.getElementById('editDesc').value.trim();
+            const value = parseFloat(document.getElementById('editValue').value) || 0;
+            const tipo = document.getElementById('editType').value;
+            const currency = document.getElementById('editCurrency').value;
+            const dateStr = document.getElementById('editDate').value;
+            const category = document.getElementById('editCategory').value;
+            const bank = document.getElementById('editBank').value || '';
+
+            if (!desc) { alert('Descrição não pode estar vazia'); return; }
+
+            const dateObj = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+
+            try {
+                await db.collection('users').doc(currentUser.uid)
+                    .collection('transactions').doc(id).update({
+                        description: desc,
+                        value: value,
+                        type: tipo,
+                        currency: currency,
+                        date: dateObj,
+                        category: category,
+                        bank: bank
+                    });
+                document.getElementById('editModal').remove();
+                await loadData();
+            } catch(e) {
+                alert('Erro ao salvar: ' + e.message);
+            }
+        }    </script>
 </body>
 </html>
 
