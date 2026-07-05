@@ -12,7 +12,11 @@
 // ===== Config =====
 const NINJA_API = 'https://protagrouter.squareweb.app';
 const MODEL = 'protagnix';
-const ALLOWED_ORIGIN = 'https://jbryan333.github.io';
+const ALLOWED_ORIGINS = [
+  'https://jbryan333.github.io',
+  'http://localhost:8000',
+  'http://127.0.0.1:5500'
+];
 
 // NINJA_KEY vem de Cloudflare Secret (não fica no código)
 // Pra setar: wrangler secret put NINJA_KEY
@@ -38,7 +42,7 @@ function checkRateLimit(ip) {
 
 // ===== CORS =====
 const corsHeaders = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
