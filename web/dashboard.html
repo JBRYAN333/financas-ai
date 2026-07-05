@@ -218,20 +218,58 @@
         /* Loading */
         .loading { text-align: center; padding: 3rem; color: var(--text-dim); }
 
-        /* Mobile */
+        /* Mobile top bar (hidden on desktop) */
+        .mobile-topbar {
+            display: none;
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 0.7rem 1rem;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .mobile-topbar .logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+        .mobile-topbar .menu-btn {
+            background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            border-radius: 8px; padding: 0.5rem 0.7rem; cursor: pointer; font-size: 1.2rem;
+        }
+        .sidebar-overlay {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 200;
+        }
+        .sidebar-overlay.show { display: block; }
+
+        /* Tablet */
         @media (max-width: 1024px) {
             .charts-grid { grid-template-columns: 1fr; }
+            .chart-card canvas { max-height: 250px; }
+            .main { padding: 1.5rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
+
+        /* Mobile */
         @media (max-width: 768px) {
-            .sidebar { width: 56px; padding: 0.8rem 0.3rem; }
-            .sidebar .logo-text, .sidebar a span, .sidebar h2, .sidebar .user-info, .sidebar #bankList, .sidebar .banks-label { display: none; }
-            .sidebar a { justify-content: center; padding: 0.7rem 0.3rem; }
-            .main { padding: 1rem; }
+            body { overflow: auto; height: auto; }
+            .app { height: auto; }
+            .sidebar {
+                position: fixed; left: -260px; top: 0;
+                width: 240px; height: 100vh; z-index: 300;
+                transition: left 0.25s ease;
+                padding: 1.5rem 1rem;
+            }
+            .sidebar.open { left: 0; }
+            .sidebar .logo-text, .sidebar a span, .sidebar h2, .sidebar .user-info, .sidebar #bankList, .sidebar .banks-label { display: block; }
+            .sidebar a { justify-content: flex-start; padding: 0.7rem 1rem; }
+            .mobile-topbar { display: flex; }
+            .main { padding: 1rem; padding-top: 0; height: auto; overflow: visible; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
             .stat-card { padding: 0.8rem; }
-            .stat-card .value { font-size: 1.2rem; }
+            .stat-card .value { font-size: 1.1rem; }
             .add-form { flex-direction: column; }
-            .add-form input, .add-form select { min-width: 100%; }
+            .add-form input, .add-form select { min-width: 100%; flex: none; }
             table { font-size: 0.78rem; }
             th, td { padding: 0.35rem; }
             .table-card { overflow-x: auto; }
@@ -239,12 +277,13 @@
             h1 { font-size: 1.3rem; }
             #filterPeriod, #filterBank, #dateFrom, #dateTo { font-size: 0.78rem; padding: 0.4rem 0.6rem; }
         }
+
+        /* Mobile pequeno */
         @media (max-width: 480px) {
-            .sidebar { display: none; }
-            .main { padding: 0.7rem; }
+            .main { padding: 0.7rem; padding-top: 0; }
             .stats-grid { grid-template-columns: 1fr; }
             .stat-card { padding: 0.7rem; }
-            .stat-card .value { font-size: 1.1rem; }
+            .stat-card .value { font-size: 1rem; }
             .chart-card { padding: 0.8rem; }
             .chart-card canvas { max-height: 180px; }
             h1 { font-size: 1.1rem; }
@@ -255,8 +294,14 @@
     </style>
 </head>
 <body>
+    <div class="mobile-topbar">
+        <div class="logo">FAI</div>
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
     <div class="app">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.5rem">
                 <div style="background:linear-gradient(135deg,#22c55e,#06b6d4);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:#052e16">FAI</div>
                 <div class="logo-text">
@@ -570,6 +615,13 @@
                 a.onclick = (e) => { e.preventDefault(); filterBank = isActive ? '' : bank; document.getElementById('filterBank').value = filterBank; updateDashboard(); updateTable(); populateBankFilter(); };
                 container.appendChild(a);
             });
+        }
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('sidebarOverlay');
+            sb.classList.toggle('open');
+            ov.classList.toggle('show');
         }
 
         let filterBank = '';
