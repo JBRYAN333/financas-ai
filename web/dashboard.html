@@ -924,8 +924,18 @@
                     saldo += converted;
                     entradas += converted;
                 } else if (t.type === 'transferencia') {
-                    // Transferência não conta como entrada nem saída
-                    // Apenas ajusta saldo se a moeda for diferente (taxa)
+                    // Transferência: neutra no saldo geral (dinheiro só trocou de banco)
+                    // Mas SE filtrando por banco específico, conta como entrada/saída desse banco
+                    if (filterBank) {
+                        if (t.fromBank === filterBank) {
+                            saldo -= converted;
+                            saidas += converted;
+                        } else if (t.toBank === filterBank) {
+                            saldo += converted;
+                            entradas += converted;
+                        }
+                    }
+                    // Sem filtro de banco: neutra (não distorce o total)
                 } else {
                     saldo -= converted;
                     saidas += converted;
@@ -966,7 +976,12 @@
                 const v = parseFloat(t.valueOriginal || t.value || 0);
                 const c = t.currency || 'BRL';
                 if (t.type === 'entrada') runningBalance += convert(v, c, userCurrency);
-                else if (t.type === 'transferencia') { /* neutro */ }
+                else if (t.type === 'transferencia') {
+                    if (filterBank) {
+                        if (t.fromBank === filterBank) runningBalance -= convert(v, c, userCurrency);
+                        else if (t.toBank === filterBank) runningBalance += convert(v, c, userCurrency);
+                    }
+                }
                 else runningBalance -= convert(v, c, userCurrency);
                 
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
