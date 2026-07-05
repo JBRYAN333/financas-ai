@@ -219,11 +219,38 @@
         .loading { text-align: center; padding: 3rem; color: var(--text-dim); }
 
         /* Mobile */
-        @media (max-width: 768px) {
-            .sidebar { width: 60px; padding: 1rem 0.5rem; }
-            .sidebar a span, .sidebar h2, .sidebar .user-info { display: none; }
-            .main { padding: 1rem; }
+        @media (max-width: 1024px) {
             .charts-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { width: 56px; padding: 0.8rem 0.3rem; }
+            .sidebar .logo-text, .sidebar a span, .sidebar h2, .sidebar .user-info, .sidebar #bankList, .sidebar .banks-label { display: none; }
+            .sidebar a { justify-content: center; padding: 0.7rem 0.3rem; }
+            .main { padding: 1rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
+            .stat-card { padding: 0.8rem; }
+            .stat-card .value { font-size: 1.2rem; }
+            .add-form { flex-direction: column; }
+            .add-form input, .add-form select { min-width: 100%; }
+            table { font-size: 0.78rem; }
+            th, td { padding: 0.35rem; }
+            .table-card { overflow-x: auto; }
+            .chart-card canvas { max-height: 200px; }
+            h1 { font-size: 1.3rem; }
+            #filterPeriod, #filterBank, #dateFrom, #dateTo { font-size: 0.78rem; padding: 0.4rem 0.6rem; }
+        }
+        @media (max-width: 480px) {
+            .sidebar { display: none; }
+            .main { padding: 0.7rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .stat-card { padding: 0.7rem; }
+            .stat-card .value { font-size: 1.1rem; }
+            .chart-card { padding: 0.8rem; }
+            .chart-card canvas { max-height: 180px; }
+            h1 { font-size: 1.1rem; }
+            .add-card { padding: 0.8rem; }
+            #filterPeriod, #filterBank { width: 100%; }
+            #dateFrom, #dateTo { width: 45%; }
         }
     </style>
 </head>
@@ -232,14 +259,14 @@
         <div class="sidebar">
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.5rem">
                 <div style="background:linear-gradient(135deg,#22c55e,#06b6d4);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:#052e16">FAI</div>
-                <div>
+                <div class="logo-text">
                     <div style="font-weight:700;font-size:1rem">Financas AI</div>
                     <div style="font-size:0.7rem;color:var(--text-dim)">inteligente</div>
                 </div>
             </div>
             <a href="#" class="active" style="gap:0"><span>Dashboard</span></a>
             <a href="index.html" style="gap:0"><span>Início</span></a>
-            <div style="padding:0.7rem 1rem 0;margin-top:1rem;font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em">Bancos</div>
+            <div class="banks-label" style="padding:0.7rem 1rem 0;margin-top:1rem;font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em">Bancos</div>
             <div id="bankList" style="display:flex;flex-direction:column;gap:0.2rem"></div>
             <div class="user-info">
                 <div style="color:var(--text);font-weight:500" id="userName">—</div>
