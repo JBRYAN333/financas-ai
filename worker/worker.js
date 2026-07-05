@@ -206,11 +206,13 @@ export default {
         const { text } = body;
         if (!text || text.length < 10) return jsonRes({ error: 'Texto do extrato obrigatório' }, 400);
 
-        const chunkSize = 4000;
+        const chunkSize = 6000;
+        const overlap = 800;
         const allTransactions = [];
 
-        for (let i = 0; i < text.length; i += chunkSize) {
+        for (let i = 0; i < text.length; i += chunkSize - overlap) {
           const chunk = text.substring(i, i + chunkSize);
+          const chunkNum = Math.floor(i / (chunkSize - overlap)) + 1;
           try {
             const resp = await fetch(NINJA_API + '/v1/chat/completions', {
               method: 'POST',
@@ -223,9 +225,58 @@ export default {
                 messages: [
                   {
                     role: 'system',
-                    content: 'Você é um extrator de transações financeiras. Analise o texto (pode ser extrato bancário de qualquer banco brasileiro, em qualquer formato). Extraia TODAS as transações encontradas. Retorne APENAS um array JSON válido, sem markdown, sem explicação:\n[{"date":"DD/MM/YYYY","description":"descrição limpa da transação","value":0.00,"type":"entrada ou saida","category":"categoria"}]\n\nRegras:\n- date: data da transação no formato DD/MM/YYYY. Se não tiver ano, use 2026.\n- description: descrição limpa (sem CPF, CNPJ, números de conta, códigos). Máximo 200 chars.\n- value: valor numérico com ponto decimal (ex: 69.90, nao 69,90).\n- type: "entrada" se for recebimento/crédito, "saida" se for pagamento/débito.\n- category: uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.\n- Ignore linhas de saldo, cabeçalho, rodapé, totais.\n- Se não encontrar nenhuma transação, retorne [].\n- Se o texto mencionar o nome do banco, inclua como campo opcional "bank".'
+                    content: `Você é um extrator especializado de transações financeiras de extratos bancários brasileiros.
+
+Analise o texto abaixo extraído de um extrato bancário. O texto pode estar desordenado, quebrado entre páginas, ou ter layout não-estruturado — típico de PDF.
+
+ Retorne APENAS um array JSON válido, sem markdown, sem texto adicional:
+[{"date":"DD/MM/YYYY","description":"descrição","value":0.00,"type":"entrada","category":"Renda"}]
+
+REGRAS CRÍTICAS:
+
+1. DATA (DD/MM/YYYY):
+   - A data aparece UMA VEZ no topo de um grupo de transações e se aplica a TODAS as transações abaixo dela até a próxima data.
+   - No Cora, o formato é: "29/05/2026 Saldo do dia R$ 0,00" seguido das transações daquele dia.
+   - Se a página quebrar e não tiver data explicita, procure a última data mencionada antes das transações.
+   - Se não tiver ano, use 2026.
+   - NUNCA use data de cabeçalho como "01/05/2026 a 01/06/2026" como data de transação.
+   - NUNCA use data do rodapé como "Extrato gerado no dia 01/06/2026" como data de transação.
+
+2. DESCRIÇÃO:
+   - Limpa, sem CPF, CNPJ, números de conta, códigos bancários, nem "..." no final.
+   - Máximo 200 chars.
+   - Ex: "Transf Pix enviada DIOGO DE JESUS D… 066.621.697-57" → "Transf Pix enviada DIOGO DE JESUS D"
+
+3. VALOR: Número decimal com PONTO (ex: 9.00, não 9,00).
+   - "- R$ 9,00" → valor 9.00, type "saida"
+   - "+ R$ 9,00" → valor 9.00, type "entrada"
+   - Converta vírgula para ponto: 9,00 → 9.00, 2.14 → 2.14 (mas se vier 2,14 vira 2.14)
+
+4. TIPO:
+   - "entrada" se for recebimento/crédito (+ ou "recebida")
+   - "saida" se for pagamento/débito (- ou "enviada")
+   - Se não tiver sinal, determine pela descrição: "recebida"=entrada, "enviada"=saida, "Pgto"=saida
+
+5. CATEGORIA: Uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.
+   - "Transf Pix recebida" → Renda
+   - "Transf Pix enviada" → Outros
+   - "Pgto QR Code Pix" → Outros
+   - "Resgate de Reserva" → Outros
+   - "Compra"/"Mercado"/"Alimentação" → Alimentação
+
+6. IGNORAR completamente:
+   - "Saldo do dia R$ X"
+   - "Saldo inicial disponível"
+   - "Saldo final disponível"
+   - "Total de entradas"
+   - "Total de saídas"
+   - Cabeçalhos, rodapés, CNPJ, Ouvidoria, "Extrato gerado no dia"
+   - "Transações", "Extrato do período"
+
+7. Se não encontrar nenhuma transação, retorne []
+8. Se o texto mencionar o nome do banco (ex: Cora, Nubank, Itaú), inclua "bank":"nome do banco"`
                   },
-                  { role: 'user', content: chunk }
+                  { role: 'user', content: `Texto do extrato (parte ${chunkNum}):\n\n${chunk}` }
                 ]
               })
             });
