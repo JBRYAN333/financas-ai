@@ -481,8 +481,8 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // URL das Firebase Functions (proxy do 9Router com auth Firebase)
-        const FUNCTIONS_URL = 'https://us-central1-financas-ai-706d2.cloudfunctions.net';
+        // URL do Cloudflare Worker (proxy do 9Router — NINJA_KEY escondida)
+        const FUNCTIONS_URL = 'https://fai-proxy.SUA-CONTA.workers.dev';
 
         let currentUser = null;
         let allTransactions = [];

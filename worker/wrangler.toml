@@ -1,0 +1,6 @@
+name = "fai-proxy"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+# NINJA_KEY vai como secret (não fica no código)
+# Pra setar: wrangler secret put NINJA_KEY
