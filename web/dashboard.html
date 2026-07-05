@@ -441,9 +441,9 @@
                     </select>
                     <div id="transferFields" style="display:none;width:100%">
                         <div class="transfer-row">
-                            <select id="transferFrom" style="min-width:120px;flex:1"></select>
+                            <input type="text" id="transferFrom" list="bankDatalist" placeholder="De (banco)" style="min-width:120px;flex:1;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem" autocomplete="off">
                             <span style="display:flex;align-items:center;color:var(--text-dim)">→</span>
-                            <select id="transferTo" style="min-width:120px;flex:1"></select>
+                            <input type="text" id="transferTo" list="bankDatalist" placeholder="Para (banco)" style="min-width:120px;flex:1;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem" autocomplete="off">
                         </div>
                     </div>
                     <input type="text" id="bancoSelect" list="bankDatalist" placeholder="— Banco —" style="min-width:140px;flex:0.5" autocomplete="off">
@@ -471,9 +471,7 @@
                 <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center">
                     <input type="file" id="importFile" accept=".pdf,.png,.jpg,.jpeg,.csv" style="display:none">
                     <label for="importFile" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.7rem 1.5rem;color:var(--text);cursor:pointer;font-size:0.9rem;font-weight:600">📎 Selecionar arquivo</label>
-                    <select id="importBankSelect" style="min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <option value="">Banco do extrato</option>
-                    </select>
+                    <input type="text" id="importBankSelect" list="bankDatalist" placeholder="Banco do extrato" style="min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem" autocomplete="off">
                     <span id="importFileName" style="font-size:0.85rem;color:var(--text-dim)"></span>
                     <button id="importBtn" onclick="processImport()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.9rem;display:none">Importar</button>
                 </div>
@@ -576,45 +574,30 @@
         // Mapeamento de ícones (SimpleIcons CDN — grátis)
         const BANK_ICONS = {
             'Nubank': 'nubank', 'Itaú': 'itau', 'Bradesco': 'bradesco',
-            'Caixa Econômica Federal': 'caixa', 'Santander': 'santander',
-            'C6 Bank': 'c6bank', 'Inter': 'bancointer', 'PicPay': 'picpay',
-            'Stone': 'stoneco', 'BTG Pactual': 'btgpactual',
+            'Santander': 'santander', 'C6 Bank': 'c6bank',
+            'PicPay': 'picpay', 'Stone': 'stoneco',
             'Mercado Pago': 'mercadopago', 'N26': 'n26', 'Monzo': 'monzo',
             'Revolut': 'revolut', 'Klarna': 'klarna', 'PayPal': 'paypal',
-            'Wise': 'wise', 'Chime': 'chime', 'HSBC': 'hsbc',
-            'Banco do Brasil': 'bancodobrasil', 'Bitso': 'bitso'
+            'Wise': 'wise', 'HSBC': 'hsbc', 'Bitso': 'bitso'
         };
 
         function getBankIcon(bank) {
             const slug = BANK_ICONS[bank];
             if (slug) {
-                return `<img class="bank-icon" src="https://cdn.simpleicons.org/${slug}/94a3b8" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="bank-icon-placeholder" style="display:none">🏦</span>`;
+                return `<img class="bank-icon" src="https://cdn.simpleicons.org/${slug}/94a3b8" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'bank-icon-placeholder',textContent:'🏦'}))">`;
             }
             return '<span class="bank-icon-placeholder">🏦</span>';
         }
 
-        // Popular datalist de bancos (autocomplete) e selects
+        // Popular datalist de bancos (autocomplete) — todos os campos usam o mesmo datalist
         function populateBanks() {
             try {
-                // Datalist para autocomplete
                 const datalist = document.getElementById('bankDatalist');
-                const importSelect = document.getElementById('importBankSelect');
-                const transferFrom = document.getElementById('transferFrom');
-                const transferTo = document.getElementById('transferTo');
-
+                if (!datalist) return;
                 BANKS.forEach(bank => {
                     const opt = document.createElement('option');
                     opt.value = bank;
                     datalist.appendChild(opt);
-
-                    const opt2 = opt.cloneNode(true);
-                    importSelect.appendChild(opt2);
-
-                    const opt3 = opt.cloneNode(true);
-                    transferFrom.appendChild(opt3);
-
-                    const opt4 = opt.cloneNode(true);
-                    transferTo.appendChild(opt4);
                 });
             } catch(e) { console.log('populateBanks error:', e); }
         }
@@ -1803,16 +1786,23 @@
             const dateObj = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
 
             try {
+                // Update único com todos os campos (Rules atualizadas pra permitir date e bank)
+            await db.collection('users').doc(currentUser.uid)
+                .collection('transactions').doc(id).update({
+                    description: desc,
+                    value: value,
+                    type: tipo,
+                    currency: currency,
+                    category: category
+                });
+            // Update separado para date e bank
+            try {
                 await db.collection('users').doc(currentUser.uid)
                     .collection('transactions').doc(id).update({
-                        description: desc,
-                        value: value,
-                        type: tipo,
-                        currency: currency,
-                        date: dateObj,
-                        category: category,
+                        date: firebase.firestore.Timestamp fromDate(dateObj),
                         bank: bank
                     });
+            } catch(e2) { console.log('date/bank update:', e2.message); }
                 document.getElementById('editModal').remove();
                 await loadData();
             } catch(e) {
