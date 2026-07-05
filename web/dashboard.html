@@ -1799,7 +1799,7 @@
             try {
                 await db.collection('users').doc(currentUser.uid)
                     .collection('transactions').doc(id).update({
-                        date: firebase.firestore.Timestamp fromDate(dateObj),
+                        date: firebase.firestore.Timestamp.fromDate(dateObj),
                         bank: bank
                     });
             } catch(e2) { console.log('date/bank update:', e2.message); }
