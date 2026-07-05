@@ -223,17 +223,19 @@
             display: none;
             background: var(--card);
             border-bottom: 1px solid var(--border);
-            padding: 0.7rem 1rem;
+            padding: 0.6rem 0.8rem;
             align-items: center;
-            justify-content: space-between;
+            gap: 0.5rem;
             position: sticky;
             top: 0;
             z-index: 100;
+            width: 100%;
         }
-        .mobile-topbar .logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+        .mobile-topbar .logo { display: flex; align-items: center; gap: 0.4rem; font-weight: 700; font-size: 0.95rem; }
         .mobile-topbar .menu-btn {
             background: var(--bg); border: 1px solid var(--border); color: var(--text);
-            border-radius: 8px; padding: 0.5rem 0.7rem; cursor: pointer; font-size: 1.2rem;
+            border-radius: 8px; padding: 0.4rem 0.6rem; cursor: pointer; font-size: 1.1rem; line-height: 1;
+            margin-left: auto;
         }
         .sidebar-overlay {
             display: none;
@@ -243,11 +245,12 @@
         .sidebar-overlay.show { display: block; }
 
         /* Tablet */
-        @media (max-width: 1024px) {
+        @media (max-width: 1024px) and (min-width: 769px) {
             .charts-grid { grid-template-columns: 1fr; }
             .chart-card canvas { max-height: 250px; }
             .main { padding: 1.5rem; }
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .sidebar { width: 200px; padding: 1rem; }
         }
 
         /* Mobile */
