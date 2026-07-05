@@ -1786,25 +1786,38 @@
             const dateObj = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
 
             try {
-                // Update único com todos os campos (Rules atualizadas pra permitir date e bank)
-            await db.collection('users').doc(currentUser.uid)
-                .collection('transactions').doc(id).update({
-                    description: desc,
-                    value: value,
-                    type: tipo,
-                    currency: currency,
-                    category: category
-                });
-            // Update separado para date e bank
-            try {
+                // Update único com todos os campos
                 await db.collection('users').doc(currentUser.uid)
                     .collection('transactions').doc(id).update({
-                        date: firebase.firestore.Timestamp.fromDate(dateObj),
+                        description: desc,
+                        value: value,
+                        type: tipo,
+                        currency: currency,
+                        category: category,
                         bank: bank
                     });
-            } catch(e2) { console.log('date/bank update:', e2.message); }
+                // Date separado pra evitar rejeição das Rules
+                try {
+                    await db.collection('users').doc(currentUser.uid)
+                        .collection('transactions').doc(id).update({
+                            date: firebase.firestore.Timestamp.fromDate(dateObj)
+                        });
+                } catch(e2) { console.log('date update (não crítico):', e2.message); }
+                // Atualiza em memória sem recarregar tudo (evita problemas com ad blocker)
+                const idx = allTransactions.findIndex(x => x.id === id);
+                if (idx >= 0) {
+                    allTransactions[idx].description = desc;
+                    allTransactions[idx].value = value;
+                    allTransactions[idx].type = tipo;
+                    allTransactions[idx].currency = currency;
+                    allTransactions[idx].category = category;
+                    allTransactions[idx].bank = bank;
+                    allTransactions[idx].date = { toDate: () => dateObj };
+                }
                 document.getElementById('editModal').remove();
-                await loadData();
+                updateDashboard();
+                updateTable();
+                populateBankFilter();
             } catch(e) {
                 alert('Erro ao salvar: ' + e.message);
             }
