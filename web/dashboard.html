@@ -254,6 +254,7 @@
 
             <div style="display:flex;gap:0.7rem;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap">
                 <select id="filterPeriod" onchange="applyPeriod()" style="padding:0.5rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem">
+                    <option value="all">Tudo</option>
                     <option value="current">Este mês</option>
                     <option value="last">Mês passado</option>
                     <option value="3m">Últimos 3 meses</option>
@@ -545,7 +546,7 @@
         }
 
         let filterBank = '';
-        let periodMode = 'current'; // current, last, 3m, 6m, 12m, all, custom
+        let periodMode = 'all'; // current, last, 3m, 6m, 12m, all, custom
         let customFrom = null;
         let customTo = null;
 
