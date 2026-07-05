@@ -1722,6 +1722,8 @@
 
             const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || Date.now());
             const dateStr = d.toISOString().split('T')[0];
+            // Guarda valor original pra comparar depois
+            window._editOriginalDate = dateStr;
 
             const div = document.createElement('div');
             div.id = 'editModal';
@@ -1782,7 +1784,9 @@
 
             if (!desc) { alert('Descrição não pode estar vazia'); return; }
 
-            const dateObj = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+            // Só atualiza date se o usuário realmente mudou a data
+            const dateChanged = dateStr && dateStr !== window._editOriginalDate;
+            const dateObj = dateChanged ? new Date(dateStr + 'T12:00:00') : null;
 
             try {
                 // Update único com TODOS os campos
@@ -1794,7 +1798,7 @@
                     category: category,
                     bank: bank
                 };
-                if (dateStr) {
+                if (dateChanged && dateObj) {
                     updateData.date = firebase.firestore.Timestamp.fromDate(dateObj);
                 }
                 console.log('Salvando edit:', id, updateData);
