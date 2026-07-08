@@ -475,6 +475,15 @@
                     <button id="importBtn" onclick="processImport()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer;font-family:inherit;font-size:0.9rem;display:none">Importar</button>
                 </div>
                 <div id="importStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                <div id="importProgress" style="margin-top:0.5rem;display:none">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;font-size:0.78rem;color:var(--text-dim)">
+                        <span id="progressLabel">Processando...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div style="background:var(--border);border-radius:20px;height:6px;overflow:hidden">
+                        <div id="progressBar" style="background:linear-gradient(90deg,#22c55e,#06b6d4);height:100%;width:0%;border-radius:20px;transition:width 0.3s ease"></div>
+                    </div>
+                </div>
                 <div id="importPreview" style="margin-top:1rem;display:none">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
                         <span style="font-size:0.9rem;font-weight:600" id="previewTitle">Transações encontradas:</span>
@@ -1142,44 +1151,63 @@
             const file = document.getElementById('importFile').files[0];
             if (!file) return;
             const status = document.getElementById('importStatus');
+            const progress = document.getElementById('importProgress');
+            const progressBar = document.getElementById('progressBar');
+            const progressLabel = document.getElementById('progressLabel');
+            const progressPercent = document.getElementById('progressPercent');
             const preview = document.getElementById('importPreview');
             preview.style.display = 'none';
+            progress.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
             pendingImport = [];
 
             const ext = file.name.split('.').pop().toLowerCase();
-            status.textContent = '⏳ Processando...';
+            progressLabel.textContent = '⏳ Lendo arquivo...';
 
             try {
                 let text = '';
+                const extractionStart = Date.now();
                 if (ext === 'pdf') {
                     text = await extractPDFText(file);
                 } else if (ext === 'csv') {
                     text = await file.text();
                 } else if (['png', 'jpg', 'jpeg'].includes(ext)) {
-                    status.textContent = '⏳ OCR da imagem... (pode levar 30s)';
+                    progressLabel.textContent = '⏳ OCR da imagem...';
                     text = await extractImageText(file);
                 } else {
+                    progress.style.display = 'none';
                     status.textContent = '❌ Formato não suportado: ' + ext;
                     return;
                 }
 
                 if (!text || text.trim().length < 10) {
-                    status.innerHTML = '❌ Não consegui ler o texto da imagem. Tente:<br>• Aumentar a resolução da screenshot<br>• Usar a versão em PDF do extrato<br>• Evitar fundo muito escuro';
+                    progress.style.display = 'none';
+                    status.innerHTML = '❌ Não consegui ler o texto. Tente:<br>• Aumentar a resolução<br>• Usar PDF em vez de imagem<br>• Evitar fundo escuro';
                     return;
                 }
-                console.log('Texto extraído (primeiros 300 chars):', text.substring(0, 300));
+                console.log('Texto extraído', text.length, 'chars em', Date.now() - extractionStart, 'ms');
 
-                status.textContent = '🧠 IA analisando extrato... (pode levar 15-30s)';
-                // IA primeiro — se adapta a qualquer banco/formato
-                let iaResult = await classifyExtractWithIA(text);
+                // IA primeiro — com progresso
+                progressLabel.textContent = '🧠 IA analisando extrato...';
+                progressBar.style.width = '5%';
+                progressPercent.textContent = '5%';
+
+                let iaResult = await classifyExtractWithIA(text, (current, total) => {
+                    const pct = 5 + Math.round((current / total) * 85);
+                    progressBar.style.width = pct + '%';
+                    progressPercent.textContent = pct + '%';
+                    progressLabel.textContent = `🧠 IA processando (${current}/${total} partes)...`;
+                });
 
                 if (!iaResult || iaResult.length === 0) {
                     // Fallback: parser local se IA falhar
-                    status.textContent = '⏳ IA sem resposta, tentando parser local...';
+                    progressLabel.textContent = '⏳ IA sem resposta, tentando parser local...';
                     const localResult = parseExtractedText(text);
                     if (localResult.length > 0) {
                         pendingImport = localResult;
                     } else {
+                        progress.style.display = 'none';
                         status.textContent = '❌ Não encontrei transações. Verifique se o arquivo é um extrato bancário.';
                         return;
                     }
@@ -1187,11 +1215,16 @@
                     pendingImport = iaResult;
                 }
 
-                // Aplica banco selecionado a todas as transações importadas
+                // Aplica banco selecionado
                 const importBank = document.getElementById('importBankSelect').value;
                 if (importBank) {
                     pendingImport.forEach(t => t.bank = importBank);
                 }
+
+                // Progresso final 100%
+                progressBar.style.width = '100%';
+                progressPercent.textContent = '100%';
+                progressLabel.textContent = `✅ ${pendingImport.length} transações encontradas`;
 
                 // Mostra preview
                 const tbody = document.getElementById('previewBody');
@@ -1210,9 +1243,13 @@
                 });
                 document.getElementById('previewTitle').textContent = `Transações encontradas: ${pendingImport.length}`;
                 preview.style.display = 'block';
-                status.textContent = `✅ ${pendingImport.length} transações encontradas. Revise e confirme.`;
+                status.textContent = '';
+
+                // Esconde progresso depois de 2s
+                setTimeout(() => { progress.style.display = 'none'; }, 2000);
 
             } catch (err) {
+                progress.style.display = 'none';
                 status.textContent = '❌ Erro: ' + err.message;
             }
         }
@@ -1386,28 +1423,55 @@
             return [];
         }
 
-        async function classifyExtractWithIA(text) {
+        async function classifyExtractWithIA(text, onProgress) {
             // IA se adapta a qualquer formato de extrato (PDF, OCR, CSV, qualquer banco)
-            // Manda em chunks de 4000 chars pra não estourar contexto
+            // Estratégia: tenta texto completo primeiro (mais rápido, 1 chamada)
+            // Só chunk se for muito grande (> 12k chars)
+            const idToken = await currentUser.getIdToken();
             const allTransactions = [];
-            const chunkSize = 4000;
-            const chunks = [];
-            for (let i = 0; i < text.length; i += chunkSize) {
-                chunks.push(text.substring(i, i + chunkSize));
+
+            async function callAI(chunk) {
+                const resp = await fetch(FUNCTIONS_URL + '/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+                    body: JSON.stringify({ text: chunk })
+                });
+                if (!resp.ok) return [];
+                const data = await resp.json();
+                return data.transactions || [];
             }
 
-            for (let i = 0; i < chunks.length; i++) {
-                try {
-                    const idToken = await currentUser.getIdToken();
-                    const resp = await fetch(FUNCTIONS_URL + '/extract', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
-                        body: JSON.stringify({ text: chunks[i] })
-                    });
-                    if (!resp.ok) continue;
-                    const data = await resp.json();
-                    if (data.transactions && data.transactions.length > 0) allTransactions.push(...data.transactions);
-                } catch (e) { console.log('IA chunk failed:', e); }
+            if (text.length <= 12000) {
+                // 🚀 Tudo de uma vez — mais rápido
+                if (onProgress) onProgress(0, 1);
+                const result = await callAI(text);
+                if (onProgress) onProgress(1, 1);
+                return result;
+            }
+
+            // Texto grande > 12k chars → chunk paralelo
+            const chunkSize = 6000; // chunk maior (menos chamadas)
+            const chunks = [];
+            for (let i = 0; i < text.length; i += chunkSize) {
+                // overlap de 300 chars entre chunks pra não cortar transação
+                const end = Math.min(i + chunkSize + 300, text.length);
+                chunks.push(text.substring(i, end));
+            }
+
+            if (onProgress) onProgress(0, chunks.length);
+
+            // Paralelo: max 4 de cada vez pra não rate-limit
+            const parallel = 4;
+            let done = 0;
+
+            for (let i = 0; i < chunks.length; i += parallel) {
+                const batch = chunks.slice(i, i + parallel);
+                const results = await Promise.all(batch.map(c => callAI(c)));
+                for (const r of results) {
+                    if (r && r.length > 0) allTransactions.push(...r);
+                }
+                done += batch.length;
+                if (onProgress) onProgress(done, chunks.length);
             }
 
             // Dedup

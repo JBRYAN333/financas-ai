@@ -200,32 +200,28 @@ export default {
       }
 
       // =====================================================
-      // /extract — Extrai transações de extrato
+      // /extract — Extrai transações de extrato (agora sem chunking server-side)
+      // O chunking e paralelização é feito pelo dashboard
       // =====================================================
       if (path === '/extract') {
         const { text } = body;
         if (!text || text.length < 10) return jsonRes({ error: 'Texto do extrato obrigatório' }, 400);
 
-        const chunkSize = 6000;
-        const overlap = 800;
-        const allTransactions = [];
-
-        for (let i = 0; i < text.length; i += chunkSize - overlap) {
-          const chunk = text.substring(i, i + chunkSize);
-          const chunkNum = Math.floor(i / (chunkSize - overlap)) + 1;
-          try {
-            const resp = await fetch(NINJA_API + '/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': '***' + NINJA_KEY,
-              },
-              body: JSON.stringify({
-                model: MODEL,
-                messages: [
-                  {
-                    role: 'system',
-                    content: `Você é um extrator especializado de transações financeiras de extratos bancários brasileiros.
+        // Chunking agora é feito pelo dashboard (client-side)
+        // O worker recebe cada chunk individualmente
+        try {
+          const resp = await fetch(NINJA_API + '/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': '***' + NINJA_KEY,
+            },
+            body: JSON.stringify({
+              model: MODEL,
+              messages: [
+                {
+                  role: 'system',
+                  content: `Você é um extrator especializado de transações financeiras de extratos bancários brasileiros.
 
 Analise o texto abaixo extraído de um extrato bancário. O texto pode estar desordenado, quebrado entre páginas, ou ter layout não-estruturado — típico de PDF.
 
@@ -236,7 +232,6 @@ REGRAS CRÍTICAS:
 
 1. DATA (DD/MM/YYYY):
    - A data aparece UMA VEZ no topo de um grupo de transações e se aplica a TODAS as transações abaixo dela até a próxima data.
-   - No Cora, o formato é: "29/05/2026 Saldo do dia R$ 0,00" seguido das transações daquele dia.
    - Se a página quebrar e não tiver data explicita, procure a última data mencionada antes das transações.
    - Se não tiver ano, use 2026.
    - NUNCA use data de cabeçalho como "01/05/2026 a 01/06/2026" como data de transação.
@@ -245,67 +240,47 @@ REGRAS CRÍTICAS:
 2. DESCRIÇÃO:
    - Limpa, sem CPF, CNPJ, números de conta, códigos bancários, nem "..." no final.
    - Máximo 200 chars.
-   - Ex: "Transf Pix enviada DIOGO DE JESUS D… 066.621.697-57" → "Transf Pix enviada DIOGO DE JESUS D"
 
 3. VALOR: Número decimal com PONTO (ex: 9.00, não 9,00).
    - "- R$ 9,00" → valor 9.00, type "saida"
    - "+ R$ 9,00" → valor 9.00, type "entrada"
-   - Converta vírgula para ponto: 9,00 → 9.00, 2.14 → 2.14 (mas se vier 2,14 vira 2.14)
+   - Converta vírgula para ponto: 9,00 → 9.00
 
 4. TIPO:
    - "entrada" se for recebimento/crédito (+ ou "recebida")
    - "saida" se for pagamento/débito (- ou "enviada")
-   - Se não tiver sinal, determine pela descrição: "recebida"=entrada, "enviada"=saida, "Pgto"=saida
+   - Se não tiver sinal, determine pela descrição
 
-5. CATEGORIA: Uma destas: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.
+5. CATEGORIA: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.
    - "Transf Pix recebida" → Renda
    - "Transf Pix enviada" → Outros
    - "Pgto QR Code Pix" → Outros
-   - "Resgate de Reserva" → Outros
-   - "Compra"/"Mercado"/"Alimentação" → Alimentação
+   - "Compra"/"Mercado" → Alimentação
 
-6. IGNORAR completamente:
-   - "Saldo do dia R$ X"
-   - "Saldo inicial disponível"
-   - "Saldo final disponível"
-   - "Total de entradas"
-   - "Total de saídas"
-   - Cabeçalhos, rodapés, CNPJ, Ouvidoria, "Extrato gerado no dia"
-   - "Transações", "Extrato do período"
-
+6. IGNORAR: saldos, cabeçalho, rodapé, totais, CNPJ, "Extrato gerado no dia"
 7. Se não encontrar nenhuma transação, retorne []
 8. Se o texto mencionar o nome do banco (ex: Cora, Nubank, Itaú), inclua "bank":"nome do banco"`
                   },
-                  { role: 'user', content: `Texto do extrato (parte ${chunkNum}):\n\n${chunk}` }
+                  { role: 'user', content: text }
                 ]
               })
-            });
+            })
+          });
 
-            if (!resp.ok) continue;
-            const rawText = await resp.text();
-            const content = extractContent(rawText);
-            if (!content) continue;
+          if (!resp.ok) return jsonRes({ error: '9Router indisponível' }, 502);
 
-            const parsed = safeParseJSONArray(content);
-            if (parsed && parsed.length > 0) allTransactions.push(...parsed);
-          } catch (e) {
-            // chunk failed, continue
-          }
+          const rawText = await resp.text();
+          const content = extractContent(rawText);
+          if (!content) return jsonRes({ transactions: [] });
+
+          const parsed = safeParseJSONArray(content);
+          return jsonRes({
+            transactions: parsed || [],
+            rateLimit: { remaining: rl.remaining, limit: RATE_LIMIT }
+          });
+        } catch (e) {
+          return jsonRes({ error: 'Erro ao processar: ' + e.message }, 500);
         }
-
-        // Dedup
-        const seen = new Set();
-        const deduped = allTransactions.filter(t => {
-          const key = `${t.date}|${t.value}|${(t.description || '').substring(0, 30).toLowerCase()}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-
-        return jsonRes({
-          transactions: deduped,
-          rateLimit: { remaining: rl.remaining, limit: RATE_LIMIT }
-        });
       }
 
       // Rota não encontrada
