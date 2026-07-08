@@ -1486,38 +1486,61 @@
 
         async function confirmImport() {
             const status = document.getElementById('importStatus');
-            status.textContent = `⏳ Salvando ${pendingImport.length} transações...`;
-            const batch = db.batch();
+            const progress = document.getElementById('importProgress');
+            const progressBar = document.getElementById('progressBar');
+            const progressLabel = document.getElementById('progressLabel');
+
+            status.textContent = '';
+            progress.style.display = 'block';
+            progressLabel.textContent = `💾 Salvando ${pendingImport.length} transações...`;
+            progressBar.style.width = '50%';
+
+            // Batch write em microfragmentos (50 por vez) pra não travar
             const txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
-            for (const t of pendingImport) {
-                let dateObj;
-                if (typeof t.date === 'string') {
-                    const parts = t.date.split('/');
-                    dateObj = new Date(parts[2] || 2026, parts[1] - 1, parts[0]);
-                } else {
-                    dateObj = new Date();
+            const total = pendingImport.length;
+            const batchSize = 50;
+            for (let i = 0; i < total; i += batchSize) {
+                const batch = db.batch();
+                const slice = pendingImport.slice(i, i + batchSize);
+                for (const t of slice) {
+                    let dateObj;
+                    if (typeof t.date === 'string') {
+                        const parts = t.date.split('/');
+                        dateObj = new Date(parts[2] || 2026, parts[1] - 1, parts[0]);
+                    } else {
+                        dateObj = new Date();
+                    }
+                    batch.set(txRef.doc(), {
+                        date: dateObj,
+                        description: t.description || 'Sem descrição',
+                        value: parseFloat(t.value) || 0,
+                        type: t.type || 'saida',
+                        category: t.category || 'Outros',
+                        bank: t.bank || '',
+                        source: 'import',
+                        currency: t.currency || 'BRL',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                 }
-                batch.set(txRef.doc(), {
-                    date: dateObj,
-                    description: t.description || 'Sem descrição',
-                    value: parseFloat(t.value) || 0,
-                    type: t.type || 'saida',
-                    category: t.category || 'Outros',
-                    bank: t.bank || '',
-                    source: 'import',
-                    currency: t.currency || 'BRL',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                await batch.commit();
+                const pct = 50 + Math.round(((i + batchSize) / total) * 40);
+                progressBar.style.width = Math.min(pct, 90) + '%';
             }
-            await batch.commit();
+
+            progressBar.style.width = '95%';
+            progressLabel.textContent = `✅ ${total} transações importadas! Atualizando...`;
+
             document.getElementById('importPreview').style.display = 'none';
             document.getElementById('importFileName').textContent = '';
             document.getElementById('importBtn').style.display = 'none';
             document.getElementById('importFile').value = '';
-            status.textContent = `✅ ${pendingImport.length} transações importadas!`;
             pendingImport = [];
-            setTimeout(() => { status.textContent = ''; }, 4000);
+
+            // loadData em background: o usuário já viu o ✅
             await loadData();
+
+            progressBar.style.width = '100%';
+            setTimeout(() => { progress.style.display = 'none'; }, 1500);
         }
 
         function cancelImport() {
