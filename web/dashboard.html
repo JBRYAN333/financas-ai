@@ -1200,6 +1200,11 @@
                     progressLabel.textContent = `🧠 IA processando (${current}/${total} partes)...`;
                 });
 
+                // Pós-processamento: limpa saldos na descrição, corrige valores negativos, datas
+                if (iaResult && iaResult.length > 0) {
+                    iaResult = cleanExtractedTransactions(iaResult);
+                }
+
                 if (!iaResult || iaResult.length === 0) {
                     // Fallback: parser local se IA falhar
                     progressLabel.textContent = '⏳ IA sem resposta, tentando parser local...';
@@ -1480,6 +1485,50 @@
                 const key = `${t.date}|${t.value}|${(t.description||'').substring(0,30).toLowerCase()}`;
                 if (seen.has(key)) return false;
                 seen.add(key);
+                return true;
+            });
+        }
+
+        // Pós-processamento: limpa dados do OCR (saldos na descrição, valores negativos, datas)
+        function cleanExtractedTransactions(transactions) {
+            return transactions.map(t => {
+                // 1. Limpa descrição: remove 'R$ X,XX' ou 'R$X.XX' que são saldos, não parte da descrição
+                let desc = (t.description || '')
+                    .replace(/R\$\s*[\d.]+,\d{2}/g, '') // R$ 752,34
+                    .replace(/R\$\s*[\d]+\.[\d]{2}/g, '') // R$ 752.34
+                    .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, '') // CPF
+                    .replace(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g, '') // CNPJ
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                // 2. Se a descrição começa com um número (saldo), remove
+                desc = desc.replace(/^\d+[\.,]\d{2}\s+/, '');
+
+                // 3. Remove prefixos de tipo que engoliram a descrição
+                desc = desc.replace(/^(Transferencia|Transferencia Pix|Debito|Fatura)\s+/i, '');
+
+                // 4. Valor: se veio negativo, normaliza (ex: -70.00 → 70.00)
+                let val = parseFloat(t.value) || 0;
+                if (val < 0) {
+                    val = Math.abs(val);
+                    t.type = 'saida';
+                }
+
+                // 5. Data: se for 01/01/2026, deixa vazia (melhor que data errada)
+                let date = t.date || '';
+                if (date === '01/01/2026') date = '';
+
+                return {
+                    ...t,
+                    date,
+                    description: desc.substring(0, 200),
+                    value: val
+                };
+            }).filter(t => {
+                // Remove transações que depois da limpeza ficaram sem descrição ou valor zero
+                const desc = (t.description || '').trim();
+                if (!desc || desc.length < 3) return false;
+                if (t.value <= 0) return false;
                 return true;
             });
         }

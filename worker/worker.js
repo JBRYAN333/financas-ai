@@ -223,43 +223,52 @@ export default {
                   role: 'system',
                   content: `Você é um extrator especializado de transações financeiras de extratos bancários brasileiros.
 
-Analise o texto abaixo extraído de um extrato bancário. O texto pode estar desordenado, quebrado entre páginas, ou ter layout não-estruturado — típico de PDF.
+Analise o texto abaixo. Ele foi extraído de um extrato bancário via OCR — pode conter erros de leitura, palavras grudadas, números confundidos com letras.
 
- Retorne APENAS um array JSON válido, sem markdown, sem texto adicional:
-[{"date":"DD/MM/YYYY","description":"descrição","value":0.00,"type":"entrada","category":"Renda"}]
+Retorne APENAS um array JSON válido, sem markdown, sem texto adicional:
+[{"date":"DD/MM/YYYY","description":"descrição","value":0.00,"type":"entrada","category":"Renda","bank":""}]
 
-REGRAS CRÍTICAS:
+REGRAS CRÍTICAS (leia TUDO antes de extrair):
 
 1. DATA (DD/MM/YYYY):
-   - A data aparece UMA VEZ no topo de um grupo de transações e se aplica a TODAS as transações abaixo dela até a próxima data.
-   - Se a página quebrar e não tiver data explicita, procure a última data mencionada antes das transações.
-   - Se não tiver ano, use 2026.
-   - NUNCA use data de cabeçalho como "01/05/2026 a 01/06/2026" como data de transação.
-   - NUNCA use data do rodapé como "Extrato gerado no dia 01/06/2026" como data de transação.
+   - A data aparece uma vez e se aplica a TODAS as transações abaixo dela até a próxima data.
+   - Se NÃO encontrar data nenhuma no texto, use null (deixe o campo date vazio). NUNCA invente 01/01/2026.
+   - Se tiver ano parcial (ex: "08/07"), complete com 2026.
+   - NUNCA use 01/01/2026 como fallback. Prefira data vazia.
 
 2. DESCRIÇÃO:
-   - Limpa, sem CPF, CNPJ, números de conta, códigos bancários, nem "..." no final.
+   - Limpe descrições. SEMPRE remova trechos como "R$ 123,45", "R$123,45" — isso é SALDO, não parte da descrição.
+   - Remova CPF, CNPJ, números de conta, "..." no final.
    - Máximo 200 chars.
+   - Ex: "Transferencia PIX Recebimento PIX - FABIOLA DE SOUZA MOURA R$ 378,54" → desCRIÇÃO deve ser "Recebimento PIX - FABIOLA DE SOUZA MOURA" (o R$ 378,54 é saldo, remova)
+   - Ex: "R$ 752,34 Transferencia PIX Recebimento PIX - Alexandro..." → descrição "Recebimento PIX - Alexandro" (R$ 752,34 é saldo)
 
-3. VALOR: Número decimal com PONTO (ex: 9.00, não 9,00).
-   - "- R$ 9,00" → valor 9.00, type "saida"
-   - "+ R$ 9,00" → valor 9.00, type "entrada"
-   - Converta vírgula para ponto: 9,00 → 9.00
+3. VALOR:
+   - Número POSITIVO com ponto decimal (ex: 9.00, não 9,00).
+   - Se o texto diz "- R$ 50,00", o valor é 50.00 e o type é "saida".
+   - Se o texto diz "R$ -70,00" ou "-70.00", o valor é 70.00 (sempre positivo) e type "saida".
+   - NUNCA retorne valor negativo.
 
-4. TIPO:
-   - "entrada" se for recebimento/crédito (+ ou "recebida")
-   - "saida" se for pagamento/débito (- ou "enviada")
-   - Se não tiver sinal, determine pela descrição
+4. TIPO: "entrada" ou "saida".
+   - Sinal + ou "recebida"/"Recebimento" → entrada
+   - Sinal - ou "enviada"/"Envio"/"Débito"/"Pagamento"/"Tarifa" → saida
 
 5. CATEGORIA: Alimentação, Transporte, Moradia, Saúde, Assinaturas, Lazer, Educação, Renda, Outros.
-   - "Transf Pix recebida" → Renda
-   - "Transf Pix enviada" → Outros
-   - "Pgto QR Code Pix" → Outros
-   - "Compra"/"Mercado" → Alimentação
+   - "iFood"/"Padaria"/"Pensão" → Alimentação
+   - "Uber" → Transporte
+   - "Farmácia"/"Drogaria" → Saúde
+   - "Netflix"/"PlayFibra"/"Play Store" → Assinaturas
+   - "INSS"/"salário"/"Benefício" → Renda
+   - "PIX" sem ser compra → veja se é recebido (Renda) ou enviado (Outros)
 
-6. IGNORAR: saldos, cabeçalho, rodapé, totais, CNPJ, "Extrato gerado no dia"
-7. Se não encontrar nenhuma transação, retorne []
-8. Se o texto mencionar o nome do banco (ex: Cora, Nubank, Itaú), inclua "bank":"nome do banco"`
+6. IGNORE COMPLETAMENTE:
+   - Linhas de saldo ("Saldo do dia R$", "R$ 123,45" solto)
+   - Cabeçalhos, rodapés, "Extrato gerado no dia"
+   - CNPJ, CPF, números de conta, "SAC", "Ouvidoria", endereços
+   - Linhas que só contêm um valor em reais (é saldo, não transação)
+
+7. IMPORTANTE: se no texto aparecer "R$" seguido de um valor sem descrição de transação, ignore — é saldo.
+   Se aparecer 
                   },
                   { role: 'user', content: text }
                 ]
