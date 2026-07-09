@@ -1446,16 +1446,16 @@
                 return data.transactions || [];
             }
 
-            if (text.length <= 12000) {
-                // 🚀 Tudo de uma vez — mais rápido
+            if (text.length <= 30000) {
+                // 🚀 Tudo de uma vez — extratos de até 30k chars (mês inteiro)
                 if (onProgress) onProgress(0, 1);
                 const result = await callAI(text);
                 if (onProgress) onProgress(1, 1);
                 return result;
             }
 
-            // Texto grande > 12k chars → chunk paralelo
-            const chunkSize = 6000; // chunk maior (menos chamadas)
+            // Texto gigante > 30k chars → chunk paralelo
+            const chunkSize = 10000; // chunk maior (menos chamadas)
             const chunks = [];
             for (let i = 0; i < text.length; i += chunkSize) {
                 // overlap de 300 chars entre chunks pra não cortar transação
