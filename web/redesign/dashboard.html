@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Conta na Mão</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .emoji-button { font-size: 3rem; cursor: pointer; transition: all 0.2s; }
+        .emoji-button:hover { transform: scale(1.1); }
+        .emoji-button.active { transform: scale(1.2); filter: brightness(1.2); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- TOP BAR -->
+    <div class="bg-white border-b sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">CN</div>
+                <span class="font-bold text-lg">Conta na Mão</span>
+            </div>
+            <button class="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+                <i class="fa-solid fa-user-circle text-xl"></i>
+                <span class="hidden sm:inline">Ryan</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <!-- SALDO GIGANTE -->
+        <div class="bg-gradient-to-br from-green-600 to-green-800 rounded-3xl p-8 text-white shadow-xl">
+            <div class="text-sm font-medium text-white/70 mb-2">Seu saldo atual</div>
+            <div class="text-5xl md:text-6xl font-extrabold mb-4">R$ 1.234,56</div>
+            <div class="flex gap-6 text-sm">
+                <div>
+                    <div class="text-white/70">Entradas mês</div>
+                    <div class="font-bold text-xl">R$ 3.540,00</div>
+                </div>
+                <div>
+                    <div class="text-white/70">Saídas mês</div>
+                    <div class="font-bold text-xl">R$ 2.305,44</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMO VOCÊ TÁ? -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 class="text-lg font-bold text-gray-900 mb-4 text-center">Como foi seu mês até agora?</h2>
+            <div class="flex justify-center gap-6">
+                <div class="text-center">
+                    <div class="emoji-button" onclick="selectMood('happy')">😊</div>
+                    <div class="text-xs text-gray-500 mt-2">Ótimo</div>
+                </div>
+                <div class="text-center">
+                    <div class="emoji-button" onclick="selectMood('neutral')">😐</div>
+                    <div class="text-xs text-gray-500 mt-2">Normal</div>
+                </div>
+                <div class="text-center">
+                    <div class="emoji-button" onclick="selectMood('sad')">😢</div>
+                    <div class="text-xs text-gray-500 mt-2">Difícil</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTÃO GIGANTE -->
+        <button onclick="showAddTransaction()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold text-xl py-8 rounded-2xl shadow-lg transition flex items-center justify-center gap-3">
+            <i class="fa-solid fa-plus text-2xl"></i>
+            Adicionar Gasto ou Ganho
+        </button>
+
+        <!-- QUICK STATS -->
+        <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm">
+                <div class="text-2xl font-bold text-gray-900">35</div>
+                <div class="text-xs text-gray-500 mt-1">Transações</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm">
+                <div class="text-2xl font-bold text-green-600">+35%</div>
+                <div class="text-xs text-gray-500 mt-1">vs mês passado</div>
+            </div>
+            <div class="bg-white rounded-xl p-4 text-center shadow-sm">
+                <div class="text-2xl font-bold text-orange-600">⚠️</div>
+                <div class="text-xs text-gray-500 mt-1">Alerta ativo</div>
+            </div>
+        </div>
+
+        <!-- CATEGORIAS TOP 3 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Onde você mais gastou</h2>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-utensils text-orange-600"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900">Alimentação</div>
+                            <div class="text-xs text-gray-500">12 transações</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-gray-900">R$ 850,00</div>
+                        <div class="text-xs text-orange-600">37%</div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-bus text-blue-600"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900">Transporte</div>
+                            <div class="text-xs text-gray-500">8 transações</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-gray-900">R$ 420,00</div>
+                        <div class="text-xs text-blue-600">18%</div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-home text-purple-600"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900">Moradia</div>
+                            <div class="text-xs text-gray-500">3 transações</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-gray-900">R$ 680,00</div>
+                        <div class="text-xs text-purple-600">29%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ÚLTIMAS TRANSAÇÕES -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Últimas movimentações</h2>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between py-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-shopping-cart text-red-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-900 text-sm">Mercado - pão e leite</div>
+                            <div class="text-xs text-gray-500">Hoje, 14:30</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold text-red-600">-R$ 35,90</div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between py-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-dollar-sign text-green-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-900 text-sm">Venda café - 15 unidades</div>
+                            <div class="text-xs text-gray-500">Ontem, 17:00</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold text-green-600">+R$ 120,00</div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between py-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-gas-pump text-red-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-900 text-sm">Posto Shell - Gasolina</div>
+                            <div class="text-xs text-gray-500">Ontem, 09:15</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold text-red-600">-R$ 80,00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ADD TRANSACTION -->
+    <div id="addModal" class="hidden fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+        <div class="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg p-6 space-y-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-900">Adicionar</h3>
+                <button onclick="closeAddTransaction()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">O que foi?</label>
+                    <input type="text" placeholder="Ex: Comprei pão no mercado" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="border-2 border-green-500 text-green-600 font-semibold py-4 rounded-xl hover:bg-green-50 transition">
+                        <i class="fa-solid fa-arrow-down mr-2"></i> Entrada
+                    </button>
+                    <button class="border-2 border-gray-200 text-gray-600 font-semibold py-4 rounded-xl hover:bg-gray-50 transition">
+                        <i class="fa-solid fa-arrow-up mr-2"></i> Saída
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+                    <i class="fa-solid fa-lightbulb mr-2"></i>
+                    <strong>Dica:</strong> Descreva como você falaria. A IA classifica sozinha!
+                </div>
+
+                <button class="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 transition">
+                    Adicionar →
+                </button>
+
+                <div class="text-center">
+                    <button class="text-sm text-gray-500 hover:text-gray-700">
+                        <i class="fa-solid fa-camera mr-2"></i>
+                        Ou tire foto do comprovante
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function selectMood(mood) {
+            document.querySelectorAll('.emoji-button').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+            console.log('Mood:', mood);
+            // TODO: Save to Firebase
+        }
+
+        function showAddTransaction() {
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+
+        function closeAddTransaction() {
+            document.getElementById('addModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
