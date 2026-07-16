@@ -699,6 +699,7 @@
             </div>
         </div>
         <div class="main">
+            <div id="pag-dashboard" class="section-page active">
             <div class="dashboard-header">
                 <h1>Dashboard</h1>
                 <p class="subtitle" id="monthLabel">Carregando...</p>
@@ -832,6 +833,7 @@
             </div>
 
 
+            </div><!-- end pag-dashboard -->
             <div class="section-page" id="pag-categorias">
               <div class="dashboard-header">
                 <h1>Categorias</h1>
@@ -2743,23 +2745,23 @@ function switchPage(page) {
   else if (page === 'insights') gerarInsights();
 }
 
-// Event delegation na sidebar
-document.addEventListener('DOMContentLoaded', function() {
-  var sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    sidebar.addEventListener('click', function(e) {
-      var target = e.target;
-      while (target && target !== sidebar) {
-        if (target.tagName === 'A' && target.getAttribute('data-page')) {
-          e.preventDefault();
-          switchPage(target.getAttribute('data-page'));
-          return;
-        }
-        target = target.parentNode;
+// Event delegation na sidebar (roda direto, DOM ja carregado)
+(function() {
+  var sb = document.getElementById('sidebar');
+  if (!sb) return;
+  sb.addEventListener('click', function(e) {
+    var t = e.target;
+    while (t && t !== sb) {
+      if (t.tagName === 'A' && t.getAttribute('data-page')) {
+        e.preventDefault();
+        e.stopPropagation();
+        switchPage(t.getAttribute('data-page'));
+        return;
       }
-    });
-  }
-});
+      t = t.parentNode;
+    }
+  });
+})();
 
 // ===== CATEGORIAS =====
 var CATS_DEFAULT = ['Alimentacao', 'Transporte', 'Moradia', 'Saude', 'Assinaturas', 'Educacao', 'Lazer', 'Renda', 'Outros'];
