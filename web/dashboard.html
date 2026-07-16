@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.min.mjs" type="module"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons@4.29.2/dist/feather.min.js"></script>
     <style>
         :root {
             /* Brand */
@@ -573,7 +574,7 @@
 .section-page { display: none; }
 .section-page.active { display: block; }
 
-.ep-opt {
+.ip-opt {
   font-size: 1.6rem;
   cursor: pointer;
   padding: 0.3rem;
@@ -585,8 +586,8 @@
   align-items: center;
   justify-content: center;
 }
-.ep-opt:hover { background: var(--border); }
-.cat-em-btn {
+.ip-opt:hover { background: var(--border); }
+.cat-ic-btn {
   font-size: 0.6rem;
   cursor: pointer;
   opacity: 0.35;
@@ -594,10 +595,10 @@
   transition: opacity 0.15s;
   vertical-align: middle;
 }
-.cat-chip:hover .cat-em-btn { opacity: 0.8; }
-#emojiGrid::-webkit-scrollbar { width: 4px; }
-#emojiGrid::-webkit-scrollbar-track { background: transparent; }
-#emojiGrid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.cat-chip:hover .cat-ic-btn { opacity: 0.8; }
+#iconGrid::-webkit-scrollbar { width: 4px; }
+#iconGrid::-webkit-scrollbar-track { background: transparent; }
+#iconGrid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 /* Nav na sidebar */
 .nav-divider { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 1rem 0 0.3rem; margin-top: 0.3rem; border-top: 1px solid var(--border); }
 
@@ -2790,27 +2791,27 @@ function switchPage(page) {
 
 // ===== CATEGORIAS =====
 var CATS_DEFAULT = [
-  {name:'Alimentacao', emoji:'🍎', type:'saida'},
-  {name:'Transporte', emoji:'🚗', type:'saida'},
-  {name:'Moradia', emoji:'🏠', type:'saida'},
-  {name:'Saude', emoji:'💊', type:'saida'},
-  {name:'Assinaturas', emoji:'📦', type:'saida'},
-  {name:'Educacao', emoji:'📚', type:'saida'},
-  {name:'Lazer', emoji:'🎮', type:'saida'},
-  {name:'Renda', emoji:'💰', type:'entrada'},
-  {name:'Outros', emoji:'📋', type:'saida'}
+  {name:'Alimentacao', icon:'coffee', type:'saida'},
+  {name:'Transporte', icon:'navigation', type:'saida'},
+  {name:'Moradia', icon:'home', type:'saida'},
+  {name:'Saude', icon:'heart', type:'saida'},
+  {name:'Assinaturas', icon:'package', type:'saida'},
+  {name:'Educacao', icon:'book', type:'saida'},
+  {name:'Lazer', icon:'game', type:'saida'},
+  {name:'Renda', icon:'dollar-sign', type:'entrada'},
+  {name:'Outros', icon:'more-horizontal', type:'saida'}
 ];
 
-var EMOJI_BANK = ['🍎','🚗','🏠','💊','📦','📚','🎮','💰','📋','🏦','💼','📈','🛒','🔧','🏪','⚡','📱','🌐','💧','🏡','🐾','👕','✈️','🎭','🎂','💳','🏧','💵','📊','🏢','🔥','🎵','🏋️','🧘','🎨','📝','🐱','🍕','☕','🍺','🌮','🧊','🎯','🧠','💡','🔐','🎒','🔔','📷','💻','🔋','🌿','🛏️','🚿','🩺','⚕️'];
+var ICON_BANK = ['coffee', 'navigation', 'home', 'heart', 'package', 'book', 'game', 'dollar-sign', 'more-horizontal', 'shopping-cart', 'tool', 'zap', 'smartphone', 'globe', 'droplet', 'home', 'battery', 'briefcase', 'trending-up', 'truck', 'settings', 'wifi', 'sun', 'moon', 'star', 'gift', 'credit-card', 'map-pin', 'film', 'music', 'camera', 'monitor', 'watch', 'umbrella', 'anchor', 'compass', 'phone', 'mail', 'message-circle', 'bell', 'calendar', 'clock', 'folder', 'file-text', 'bar-chart', 'pie-chart', 'activity', 'users', 'user', 'shield', 'lock', 'unlock', 'award', 'flag', 'tv', 'radio', 'bluetooth', 'cast', 'database', 'cpu', 'code', 'terminal', 'hash', 'minus', 'chevron-up', 'chevron-down', 'plus', 'check', 'crosshair', 'circle', 'square', 'maximize', 'minimize', 'rotate-ccw', 'rotate-cw', 'search', 'download', 'upload', 'cloud', 'server', 'archive', 'trash-2', 'printer', 'scissors'];
 
-var _emojiCallback = null;
+
 
 function getCats() {
   var c = window._cats;
   if (c && Array.isArray(c) && c.length && typeof c[0] === 'object') return c;
   if (c && Array.isArray(c) && c.length) {
     // Convert old string cats to objects
-    c = c.map(function(n) { return {name:n, emoji:'📋', type:'saida'}; });
+    c = c.map(function(n) { return {name:n, icon:'more-horizontal', type:'saida'}; });
     window._cats = c;
     return c;
   }
@@ -2818,7 +2819,7 @@ function getCats() {
   if (currentUser && currentUser.cats && currentUser.cats.length) {
     c = currentUser.cats;
     if (typeof c[0] === 'string') {
-      c = c.map(function(n) { return {name:n, emoji:'📋', type:'saida'}; });
+      c = c.map(function(n) { return {name:n, icon:'more-horizontal', type:'saida'}; });
     }
     window._cats = c;
     return c;
@@ -2826,23 +2827,23 @@ function getCats() {
   return CATS_DEFAULT;
 }
 
-function catEmojiFromName(name) {
+function catIconFromName(name) {
   var map = {
-    'alimentacao':'🍎','comida':'🍕','mercado':'🛒','feira':'🥬','restaurante':'🍽️',
-    'transporte':'🚗','uber':'🚗','combustivel':'⛽','gasolina':'⛽','metro':'🚇','onibus':'🚌',
-    'moradia':'🏠','aluguel':'🏡','condominio':'🏢','luz':'⚡','agua':'💧','energia':'⚡','gas':'🔥',
-    'saude':'💊','medico':'🩺','farmacia':'💊','hospital':'🏥','plano':'🩺','dentista':'🦷',
-    'assinaturas':'📦','spotify':'🎵','netflix':'🎬','streaming':'🎬','internet':'🌐','telefone':'📱',
-    'educacao':'📚','curso':'🎓','faculdade':'🎓','escola':'📖','livro':'📚',
-    'lazer':'🎮','cinema':'🎬','jogo':'🎮','viagem':'✈️','festa':'🎉','esporte':'🏋️',
-    'renda':'💰','salario':'💵','freela':'💼','investimento':'📈','bonus':'🎁','extra':'💸',
-    'outros':'📋'
+    'alimentacao':'coffee','comida':'coffee','mercado':'shopping-cart','feira':'shopping-cart','restaurante':'coffee',
+    'transporte':'navigation','uber':'navigation','combustivel':'zap','gasolina':'zap','metro':'navigation','onibus':'navigation',
+    'moradia':'home','aluguel':'home','condominio':'home','luz':'zap','agua':'droplet','energia':'zap','gas':'zap',
+    'saude':'heart','medico':'heart','farmacia':'heart','hospital':'heart','plano':'heart','dentista':'heart',
+    'assinaturas':'package','spotify':'music','netflix':'film','streaming':'film','internet':'globe','telefone':'smartphone',
+    'educacao':'book','curso':'book','faculdade':'book','escola':'book','livro':'book',
+    'lazer':'game','cinema':'film','jogo':'game','viagem':'map-pin','festa':'gift','esporte':'activity',
+    'renda':'dollar-sign','salario':'dollar-sign','freela':'briefcase','investimento':'trending-up','bonus':'gift','extra':'dollar-sign',
+    'outros':'more-horizontal'
   };
   var n = name.toLowerCase().trim();
   for (var key in map) {
     if (n === key || n.indexOf(key) >= 0) return map[key];
   }
-  return '📋';
+  return 'more-horizontal';
 }
 
 async function carregarCats() {
@@ -2852,7 +2853,7 @@ async function carregarCats() {
     if (doc.exists && doc.data().cats && Array.isArray(doc.data().cats) && doc.data().cats.length) {
       var raw = doc.data().cats;
       var cats = (typeof raw[0] === 'string')
-        ? raw.map(function(n) { return {name:n, emoji:catEmojiFromName(n), type:'saida'}; })
+        ? raw.map(function(n) { return {name:n, icon:catIconFromName(n), type:'saida'}; })
         : raw;
       window._cats = cats;
       currentUser.cats = cats;
@@ -2870,15 +2871,15 @@ function renderCats() {
   var cats = getCats();
   list.innerHTML = cats.map(function(c) {
     var nm = c.name || c;
-    var em = c.emoji || '📋';
+    var ic = c.icon || 'more-horizontal';
     var isDef = false;
     for (var i = 0; i < CATS_DEFAULT.length; i++) {
       if (CATS_DEFAULT[i].name === nm) { isDef = true; break; }
     }
     var delBtn = isDef ? '' : ' <span class="cat-rm" onclick="rmCat(\'' + nm + '\')">\u2716</span>';
-    var emBtn = ' <span class="cat-em-btn" onclick="openEmojiPicker(\'' + nm + '\')" title="Emoji">\uD83C\uDFF7</span>';
-    return '<span class="cat-chip" data-name="' + nm + '">' + em + ' ' + nm + emBtn + delBtn + '</span>';
+    return '<span class="cat-chip" data-name="' + nm + '"><i data-feather="' + ic + '" style="width:14px;height:14px;vertical-align:middle;stroke-width:2"></i> ' + nm + ' <span class="cat-em-btn" onclick="openIconPicker(\'' + nm + '\')" title="Icone">[..]</span>' + delBtn + '</span>';
   }).join('');
+  if (window.feather) feather.replace();
 }
 
 async function addCat() {
@@ -2892,8 +2893,8 @@ async function addCat() {
       return;
     }
   }
-  openEmojiPicker(function(emoji) {
-    cats.push({name:name, emoji:emoji, type:'saida'});
+  openIconPicker(function(icon) {
+    cats.push({name:name, icon:icon, type:'saida'});
     window._cats = cats;
     currentUser.cats = cats;
     db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true }).then(function() {
@@ -2921,42 +2922,42 @@ async function rmCat(name) {
   fillRecCat();
 }
 
-var _emojiPickCb = null;
+var _iconPickCb = null;
 
-function openEmojiPicker(catName) {
-  var picker = document.getElementById('emojiPicker');
+function openIconPicker(catName) {
+  var picker = document.getElementById('iconPicker');
   if (!picker) return;
   picker.style.display = 'flex';
-  var grid = document.getElementById('emojiGrid');
+  var grid = document.getElementById('iconGrid');
   if (!grid) return;
   // Se for callback (new category), guarda; se for string, salva no data-cat
-  if (typeof catName === 'function') { _emojiPickCb = catName; }
-  else { _emojiPickCb = null; picker.setAttribute('data-cat', catName); }
+  if (typeof catName === 'function') { _iconPickCb = catName; }
+  else { _iconPickCb = null; picker.setAttribute('data-cat', catName); }
   grid.innerHTML = EMOJI_BANK.map(function(e) {
-    return '<span class="ep-opt" onclick="selectEmoji(\'' + e + '\')">' + e + '</span>';
+    return '<span class="ep-opt" onclick="selectIcon(\'' + e + '\')">' + e + '</span>';
   }).join('');
-  document.getElementById('epSearch').value = '';
+  document.getElementById('icSearch').value = '';
 }
 
-function closeEmojiPicker() {
-  document.getElementById('emojiPicker').style.display = 'none';
-  _emojiPickCb = null;
+function closeIconPicker() {
+  document.getElementById('iconPicker').style.display = 'none';
+  _iconPickCb = null;
 }
 
-function selectEmoji(emoji) {
-  if (_emojiPickCb) {
-    _emojiPickCb(emoji);
-    _emojiPickCb = null;
-    closeEmojiPicker();
+function selectIcon(icon) {
+  if (_iconPickCb) {
+    _iconPickCb(icon);
+    _iconPickCb = null;
+    closeIconPicker();
     return;
   }
-  var picker = document.getElementById('emojiPicker');
+  var picker = document.getElementById('iconPicker');
   var catName = picker.getAttribute('data-cat');
-  if (!catName) { closeEmojiPicker(); return; }
+  if (!catName) { closeIconPicker(); return; }
   var cats = getCats();
   for (var i = 0; i < cats.length; i++) {
     if ((cats[i].name || cats[i]) === catName) {
-      cats[i].emoji = emoji;
+      cats[i].icon = icon;
       break;
     }
   }
@@ -2964,12 +2965,12 @@ function selectEmoji(emoji) {
   currentUser.cats = cats;
   db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
   renderCats();
-  closeEmojiPicker();
+  closeIconPicker();
 }
 
-function filterEmojiPicker() {
-  var q = document.getElementById('epSearch').value.toLowerCase().trim();
-  var all = document.querySelectorAll('#emojiGrid .ep-opt');
+function filterIconPicker() {
+  var q = document.getElementById('icSearch').value.toLowerCase().trim();
+  var all = document.querySelectorAll('#iconGrid .ip-opt');
   for (var i = 0; i < all.length; i++) {
     all[i].style.display = (!q || all[i].textContent.toLowerCase().includes(q)) ? '' : 'none';
   }
@@ -2988,8 +2989,13 @@ async function getBgt() {
 function fillBgtCat() {
   var sel = document.getElementById('bgtCat');
   if (!sel) return;
-  var cats = getCats().filter(function(c) { return c !== 'Renda' && c !== 'Outros'; });
-  sel.innerHTML = cats.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+  var cats = getCats();
+  var names = [];
+  for (var i = 0; i < cats.length; i++) {
+    var n = cats[i].name || cats[i];
+    if (n !== 'Renda' && n !== 'Outros') names.push(n);
+  }
+  sel.innerHTML = names.map(function(n) { return '<option value="' + n + '">' + n + '</option>'; }).join('');
 }
 
 async function setBgt() {
@@ -3142,7 +3148,11 @@ async function delMeta(id) {
 function fillRecCat() {
   var sel = document.getElementById('recCat');
   if (!sel) return;
-  sel.innerHTML = getCats().map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+  var cats = getCats();
+  sel.innerHTML = cats.map(function(c) {
+    var n = c.name || c;
+    return '<option value="' + n + '">' + n + '</option>';
+  }).join('');
 }
 
 async function getRecs() {
@@ -3332,14 +3342,14 @@ loadData = async function() {
 </script>
 
 <!-- Emoji Picker -->
-<div id="emojiPicker" class="modal-wrap" style="display:none" onclick="if(event.target===this)closeEmojiPicker()">
+<div id="iconPicker" class="modal-wrap" style="display:none" onclick="if(event.target===this)closeIconPicker()">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-      <h3 style="margin:0">Escolher emoji</h3>
-      <span onclick="closeEmojiPicker()" style="cursor:pointer;font-size:1.2rem;color:var(--text-dim)">&times;</span>
+      <h3 style="margin:0">Escolher icone</h3>
+      <span onclick="closeIconPicker()" style="cursor:pointer;font-size:1.2rem;color:var(--text-dim)">&times;</span>
     </div>
-    <input type="text" id="epSearch" placeholder="Buscar emoji..." oninput="filterEmojiPicker()" style="width:100%;padding:0.5rem 0.7rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:0.5rem;box-sizing:border-box">
-    <div id="emojiGrid" style="display:flex;flex-wrap:wrap;gap:0.3rem;max-height:300px;overflow-y:auto;justify-content:center;padding:0.3rem 0"></div>
+    <input type="text" id="icSearch" placeholder="Buscar icone..." oninput="filterIconPicker()" style="width:100%;padding:0.5rem 0.7rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:0.5rem;box-sizing:border-box">
+    <div id="iconGrid" style="display:flex;flex-wrap:wrap;gap:0.3rem;max-height:300px;overflow-y:auto;justify-content:center;padding:0.3rem 0"></div>
   </div>
 </div>
 </body>
