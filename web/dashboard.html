@@ -277,6 +277,8 @@
             font-size: 0.82rem;
             transition: all var(--transition-fast);
         }
+        #searchInput:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+        #searchInput.hasValue { padding-right: 2rem; }
         .dashboard-header select:focus, .dashboard-header input:focus {
             border-color: var(--green);
             box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
@@ -621,6 +623,10 @@
                     <select id="filterBank" onchange="applyFilters()">
                         <option value="">🏦 Todos os bancos</option>
                     </select>
+                    <div style="position:relative;flex:1;min-width:180px">
+                        <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor, categoria..." oninput="applySearch()" style="width:100%;padding:0.5rem 0.9rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;transition:all var(--transition-fast)">
+                        <span id="searchClear" onclick="clearSearch()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:0.8rem;color:var(--text-dim);padding:0.2rem">✕</span>
+                    </div>
                 </div>
             </div>
 
@@ -973,11 +979,12 @@
         }
 
         let filterBank = '';
+        let searchTerm = '';
         let periodMode = 'all'; // current, last, 3m, 6m, 12m, all, custom
         let customFrom = null;
         let customTo = null;
 
-        function applyPeriod() {
+        function applyPeriod() { currentPage = 1;
             const sel = document.getElementById('filterPeriod');
             const fromInput = document.getElementById('dateFrom');
             const toInput = document.getElementById('dateTo');
@@ -1044,16 +1051,52 @@
         }
         function applyFilters() {
             filterBank = document.getElementById('filterBank').value;
+            currentPage = 1;
             updateDashboard();
+            updateTable();
+        }
+        function applySearch() {
+            const input = document.getElementById('searchInput');
+            const clear = document.getElementById('searchClear');
+            searchTerm = input.value;
+            if (searchTerm.trim()) {
+                clear.style.display = 'block';
+                input.classList.add('hasValue');
+            } else {
+                clear.style.display = 'none';
+                input.classList.remove('hasValue');
+            }
+            currentPage = 1;
+            updateTable();
+        }
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchClear').style.display = 'none';
+            document.getElementById('searchInput').classList.remove('hasValue');
+            searchTerm = '';
+            currentPage = 1;
             updateTable();
         }
 
         function getFilteredTransactions() {
             const range = getPeriodRange();
+            const term = searchTerm.trim().toLowerCase();
             return allTransactions.filter(t => {
                 if (filterBank && t.bank !== filterBank) return false;
                 const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
                 if (d < range.from || d > range.to) return false;
+                // Search filter
+                if (term) {
+                    const dateStr = d.toLocaleDateString('pt-BR');
+                    const desc = (t.description || '').toLowerCase();
+                    const cat = (t.category || '').toLowerCase();
+                    const bank = (t.bank || '').toLowerCase();
+                    const val = parseFloat(t.valueOriginal || t.value || 0).toFixed(2);
+                    const type = t.type || '';
+                    // Match against description, date, category, bank, value, type
+                    const haystack = `${dateStr} ${desc} ${cat} ${bank} ${val} ${type}`;
+                    if (!haystack.includes(term)) return false;
+                }
                 return true;
             });
         }
@@ -1330,10 +1373,16 @@
                 const bankLabel = t.bank || '—';
                 const typeIcon = t.type === 'entrada' ? '+' : (t.type === 'transferencia' ? '⇄' : '-');
                 const typeClass = t.type === 'entrada' ? 'positive' : (t.type === 'transferencia' ? '' : 'negative');
+                function highlight(text) {
+                    if (!searchTerm.trim()) return text || '—';
+                    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\]/g, '\\$&');
+                    const parts = (text || '—').toString().split(new RegExp('(' + escaped + ')', 'gi'));
+                    return parts.map(p => p.toLowerCase() === searchTerm.trim().toLowerCase() ? '<mark style="background:rgba(16,185,129,0.25);color:var(--text);border-radius:2px;padding:0.1rem 0">' + p + '</mark>' : p).join('');
+                }
                 tr.innerHTML = `
-                    <td>${d.toLocaleDateString('pt-BR')}</td>
-                    <td>${t.description || '—'}</td>
-                    <td><span class="category-badge">${catLabel}</span></td>
+                    <td>${highlight(d.toLocaleDateString('pt-BR'))}</td>
+                    <td>${highlight(t.description || '—')}</td>
+                    <td><span class="category-badge">${highlight(catLabel)}</span></td>
                     <td class="${typeClass}">
                         ${typeIcon} ${formatValue(valueOrig, curr)}${showOriginal ? ` <span style="font-size:0.65rem;color:var(--text-dim)">(${parseFloat(valueOrig).toFixed(2)} ${curr})</span>` : ''}
                     </td>
