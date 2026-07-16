@@ -2765,6 +2765,8 @@ function switchPage(page) {
   document.querySelectorAll('#sidebar a').forEach(function(a) { a.classList.remove('active'); });
   var link = document.querySelector('#sidebar a[data-page="' + page + '"]');
   if (link) link.classList.add('active');
+  // Salva no hash pra persistir refresh
+  location.hash = page;
   if (page === 'categorias') renderCats();
   else if (page === 'orcamento') { fillBgtCat(); renderBgt(); }
   else if (page === 'metas') renderMetas();
@@ -2951,4 +2953,14 @@ function pickEmoji(catName) {
     renderCats();
   });
 }
+// ===== HOOK no loadData =====
+var _origLoad = loadData;
+loadData = async function() {
+  await _origLoad.apply(this, arguments);
+  try { await carregarCats(); window._bgtCache = await getBgt(); await procRecs(); } catch(e) {}
+  // Restore section from URL hash on refresh
+  var h = location.hash.replace('#','');
+  if (h && document.getElementById('pag-' + h)) { switchPage(h); }
+};
 
+</script>
