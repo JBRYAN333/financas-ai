@@ -1141,10 +1141,27 @@
             document.getElementById('transCount').textContent = `(${filtered.length})`;
 
             // Charts
+            window._lastOrdered = ordered;
+            window._lastCategories = categories;
             updateCharts(ordered, categories);
         }
 
+        function getCSSVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+        function getChartColors() {
+            const pies = getCSSVar('--chart-pie-colors').split(',');
+            return {
+                line: getCSSVar('--chart-line'),
+                fill: getCSSVar('--chart-fill'),
+                grid: getCSSVar('--chart-grid'),
+                text: getCSSVar('--chart-text'),
+                point: getCSSVar('--chart-point'),
+                pie: pies
+            };
+        }
         function updateCharts(ordered, categories) {
+            const cc = getChartColors();
             // Line chart - balance over time
             const ctxL = document.getElementById('chartLinha').getContext('2d');
             if (chartLinha) chartLinha.destroy();
@@ -1177,11 +1194,12 @@
                     datasets: [{
                         label: 'Saldo',
                         data,
-                        borderColor: '#22c55e',
-                        backgroundColor: 'var(--sidebar-hover)',
+                        borderColor: cc.line,
+                        backgroundColor: cc.fill,
                         fill: true,
                         tension: 0.3,
-                        pointRadius: 3
+                        pointRadius: 4,
+                        pointBackgroundColor: cc.point
                     }]
                 },
                 options: {
@@ -1190,12 +1208,12 @@
                     plugins: { legend: { display: false } },
                     scales: {
                         x: { 
-                            ticks: { color: '#94a3b8', maxTicksLimit: 8 },
-                            grid: { color: 'rgba(51,65,85,0.3)' }
+                            ticks: { color: cc.text, maxTicksLimit: 8 },
+                            grid: { color: cc.grid }
                         },
                         y: { 
-                            ticks: { color: '#94a3b8' },
-                            grid: { color: 'rgba(51,65,85,0.3)' }
+                            ticks: { color: cc.text },
+                            grid: { color: cc.grid }
                         }
                     }
                 }
@@ -1206,7 +1224,6 @@
             if (chartPizza) chartPizza.destroy();
 
             const catEntries = Object.entries(categories).sort((a,b) => b[1] - a[1]);
-            const colors = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
 
             chartPizza = new Chart(ctxP, {
                 type: 'doughnut',
@@ -1214,13 +1231,14 @@
                     labels: catEntries.map(c => c[0]),
                     datasets: [{
                         data: catEntries.map(c => c[1]),
-                        backgroundColor: colors.slice(0, catEntries.length),
+                        backgroundColor: cc.pie.slice(0, catEntries.length),
                         borderWidth: 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    cutout: '60%',
                     plugins: {
                         legend: {
                             position: 'bottom',
@@ -2028,13 +2046,19 @@
             window.location.href = 'index.html';
         }
         function toggleTheme() {
-            const html = document.documentElement;
-            const current = html.getAttribute('data-theme');
+            const htmlEl = document.documentElement;
+            const current = htmlEl.getAttribute('data-theme');
             const next = current === 'light' ? '' : 'light';
-            html.setAttribute('data-theme', next);
+            htmlEl.setAttribute('data-theme', next);
             localStorage.setItem('theme', next);
-            document.getElementById('themeLabel').textContent = next === 'light' ? '☀️ Claro' : '🌙 Escuro';
-            setTimeout(() => { if (typeof updateCharts === 'function') updateCharts(); }, 100);
+            const label = document.getElementById('themeLabel');
+            if (label) label.textContent = next === 'light' ? '☀️ Claro' : '🌙 Escuro';
+            // Re-render charts with new CSS variable values
+            requestAnimationFrame(() => {
+                if (typeof updateCharts === 'function' && window._lastOrdered && window._lastCategories) {
+                    updateCharts(window._lastOrdered, window._lastCategories);
+                }
+            });
         }
         function applySavedTheme() {
             const saved = localStorage.getItem('theme');
@@ -2043,6 +2067,7 @@
                 document.getElementById('themeLabel').textContent = '☀️ Claro';
             }
         }
+        // Apply saved theme and schedule chart redraw after data loads
         setTimeout(applySavedTheme, 0);
 
         // Settings modal
