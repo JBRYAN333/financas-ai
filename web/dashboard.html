@@ -1113,6 +1113,9 @@
             updateTable();
             populateBankFilter();
           } catch(e) { console.error('loadData error:', e); document.getElementById('transactionsLoading').textContent = 'Erro: ' + e.message; }
+          // Restore section from URL hash on refresh
+          var h = location.hash.replace('#','');
+          if (h && document.getElementById('pag-' + h)) { switchPage(h); }
         }
 
         function populateBankFilter() {
