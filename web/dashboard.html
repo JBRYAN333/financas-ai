@@ -1927,6 +1927,23 @@
             // loadData em background: o usuário já viu o ✅
             await loadData();
 
+            // Discord notification — resumo do lote importado
+            let totalEntrada = 0, totalSaida = 0;
+            const firstTx = pendingImport[0] || {};
+            const arquivo = document.getElementById('importFileName')?.textContent || '';
+            for (const t of pendingImport) {
+                const v = parseFloat(t.value) || 0;
+                if (t.type === 'entrada') totalEntrada += v;
+                else if (t.type === 'saida') totalSaida += v;
+            }
+            sendDiscordNotification(firstTx, {
+                batch: true,
+                count: total,
+                totalEntrada,
+                totalSaida,
+                arquivo
+            });
+
             progressBar.style.width = '100%';
             setTimeout(() => { progress.style.display = 'none'; }, 1500);
         }
@@ -2150,7 +2167,7 @@
 
 
         
-        async function sendDiscordNotification(transaction) {
+        async function sendDiscordNotification(transaction, options = {}) {
             try {
                 const doc = await db.collection('users').doc(currentUser.uid).get();
                 if (!doc.exists) return;
@@ -2158,36 +2175,94 @@
                 const url = d.webhookUrl || '';
                 if (!url || !url.includes('discord.com/api/webhooks/')) return;
                 if (!d.notifications?.discord) return;
-                const dt = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date || Date.now());
-                const dateStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-                const typeIcon = transaction.type === 'entrada' ? '⬱' : (transaction.type === 'transferencia' ? '⇄' : '⬳');
-                const typeLabel = transaction.type === 'entrada' ? 'Entrada' : (transaction.type === 'transferencia' ? 'Transferência' : 'Saída');
-                const valor = transaction.value || 0;
-                const cur = transaction.currency || 'BRL';
-                const valorStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(valor);
-                const desc = transaction.description || 'Sem descrição';
-                const cat = transaction.category || 'Outros';
-                const bank = transaction.bank || '';
-                const embed = {
-                    title: typeIcon + ' ' + typeLabel + ' — ' + valorStr,
-                    description: desc,
-                    color: transaction.type === 'entrada' ? 0x10b981 : (transaction.type === 'transferencia' ? 0x3b82f6 : 0xef4444),
+
+                const embeds = [];
+
+                // 1º embed — transação individual OU resumo de importação
+                if (options.batch) {
+                    // Importação em lote
+                    const cur = transaction.currency || 'BRL';
+                    const entradaStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(options.totalEntrada || 0);
+                    const saidaStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(options.totalSaida || 0);
+                    const arquivo = options.arquivo ? ` (${options.arquivo})` : '';
+                    embeds.push({
+                        title: `📁 ${options.count} transações importadas${arquivo}`,
+                        description: `${options.count} transações salvas via importação de arquivo.`,
+                        color: 0x8b5cf6,
+                        fields: [
+                            { name: '⬱ Entradas', value: entradaStr, inline: true },
+                            { name: '⬳ Saídas', value: saidaStr, inline: true }
+                        ]
+                    });
+                } else if (transaction) {
+                    // Transação individual (manual ou OCR)
+                    const dt = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date || Date.now());
+                    const dateStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+                    const typeIcon = transaction.type === 'entrada' ? '⬱' : (transaction.type === 'transferencia' ? '⇄' : '⬳');
+                    const typeLabel = transaction.type === 'entrada' ? 'Entrada' : (transaction.type === 'transferencia' ? 'Transferência' : 'Saída');
+                    const valor = transaction.value || 0;
+                    const cur = transaction.currency || 'BRL';
+                    const valorStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(valor);
+                    const desc = transaction.description || 'Sem descrição';
+                    const cat = transaction.category || 'Outros';
+                    const bank = transaction.bank || '';
+                    const embed = {
+                        title: typeIcon + ' ' + typeLabel + ' — ' + valorStr,
+                        description: desc,
+                        color: transaction.type === 'entrada' ? 0x10b981 : (transaction.type === 'transferencia' ? 0x3b82f6 : 0xef4444),
+                        fields: [
+                            { name: 'Categoria', value: cat, inline: true },
+                            { name: 'Valor', value: valorStr, inline: true },
+                            { name: 'Data', value: dateStr, inline: true }
+                        ]
+                    };
+                    if (bank) embed.fields.push({ name: 'Banco', value: bank, inline: true });
+                    embeds.push(embed);
+                }
+
+                // 2º embed — resumo mensal + saldo geral
+                const now = new Date();
+                const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+                let mesEntradas = 0, mesSaidas = 0, saldoGeral = 0;
+
+                if (allTransactions && allTransactions.length) {
+                    for (const t of allTransactions) {
+                        const v = parseFloat(t.valueOriginal || t.value || 0);
+                        const c = t.currency || 'BRL';
+                        const converted = typeof convert === 'function' ? convert(v, c, userCurrency) : v;
+                        const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                        const isThisMonth = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+
+                        if (t.type === 'entrada') {
+                            saldoGeral += converted;
+                            if (isThisMonth) mesEntradas += converted;
+                        } else if (t.type !== 'transferencia') {
+                            saldoGeral -= converted;
+                            if (isThisMonth) mesSaidas += converted;
+                        }
+                    }
+                }
+
+                embeds.push({
+                    title: `📊 Resumo — ${monthNames[now.getMonth()]}`,
+                    color: 0x3b82f6,
                     fields: [
-                        { name: 'Categoria', value: cat, inline: true },
-                        { name: 'Valor', value: valorStr, inline: true },
-                        { name: 'Data', value: dateStr, inline: true }
+                        { name: '⬱ Entradas do mês', value: formatValue(mesEntradas), inline: true },
+                        { name: '⬳ Saídas do mês', value: formatValue(mesSaidas), inline: true },
+                        { name: '💰 Saldo total', value: formatValue(saldoGeral), inline: false }
                     ],
                     footer: { text: 'FAI — Finanças Inteligentes' },
                     timestamp: new Date().toISOString()
-                };
-                if (bank) embed.fields.push({ name: 'Banco', value: bank, inline: true });
+                });
+
                 await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         username: 'FAI - Finanças',
                         avatar_url: 'https://jbryan333.github.io/financas-ai/web/favicon.svg',
-                        embeds: [embed]
+                        embeds
                     })
                 });
             } catch(e) {
