@@ -277,12 +277,12 @@
             font-size: 0.82rem;
             transition: all var(--transition-fast);
         }
-        #searchInput:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
-        #searchInput.hasValue { padding-right: 2rem; }
         .dashboard-header select:focus, .dashboard-header input:focus {
             border-color: var(--green);
             box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
         }
+        #searchInput:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+        
 
         /* Cards */
         .stats-grid {
@@ -623,10 +623,6 @@
                     <select id="filterBank" onchange="applyFilters()">
                         <option value="">🏦 Todos os bancos</option>
                     </select>
-                    <div style="position:relative;flex:1;min-width:180px">
-                        <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor, categoria..." oninput="applySearch()" style="width:100%;padding:0.5rem 0.9rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;transition:all var(--transition-fast)">
-                        <span id="searchClear" onclick="clearSearch()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:0.8rem;color:var(--text-dim);padding:0.2rem">✕</span>
-                    </div>
                 </div>
             </div>
 
@@ -744,7 +740,11 @@
                 <h3>📋 Últimas transações <span id="transCount"></span></h3>
                 <div id="transactionsLoading" class="loading"><div class="loading-spinner"></div><span>Carregando...</span></div>
                 <div id="transactionsTableContainer" style="display:none">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem">
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px">
+                            <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor..." oninput="applySearch()" style="padding:0.45rem 0.8rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;flex:1;min-width:140px;transition:all var(--transition-fast)">
+                            <span id="searchClear" onclick="clearSearch()" style="display:none;cursor:pointer;font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0.5rem;white-space:nowrap">✕ Limpar</span>
+                        </div>
                         <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
                         <div style="display:flex;gap:0.5rem">
                             <button onclick="exportCSV()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">📥 CSV</button>
