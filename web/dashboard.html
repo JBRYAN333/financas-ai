@@ -574,27 +574,29 @@
 .section-page.active { display: block; }
 
 .ip-opt {
-  font-size: 1.6rem;
   cursor: pointer;
-  padding: 0.3rem;
+  padding: 0.4rem;
   border-radius: 8px;
   transition: background 0.15s;
-  line-height: 1;
   width: 40px; height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.ip-opt svg { width: 22px; height: 22px; opacity: 0.6; transition: opacity 0.15s; }
+.ip-opt:hover { background: var(--border); }
+.ip-opt:hover svg { opacity: 1; }
 .ip-opt:hover { background: var(--border); }
 .cat-ic-btn {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   cursor: pointer;
-  opacity: 0.35;
-  margin-left: 0.15rem;
+  opacity: 0;
+  margin-left: 0.2rem;
   transition: opacity 0.15s;
   vertical-align: middle;
+  font-size: 0.75rem;
 }
-.cat-chip:hover .cat-ic-btn { opacity: 0.8; }
+.cat-chip:hover .cat-ic-btn { opacity: 0.7; }
 #iconGrid::-webkit-scrollbar { width: 4px; }
 #iconGrid::-webkit-scrollbar-track { background: transparent; }
 #iconGrid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -2980,7 +2982,8 @@ function filterIconPicker() {
   var q = document.getElementById('icSearch').value.toLowerCase().trim();
   var all = document.querySelectorAll('#iconGrid .ip-opt');
   for (var i = 0; i < all.length; i++) {
-    all[i].style.display = (!q || all[i].textContent.toLowerCase().includes(q)) ? '' : 'none';
+    var name = all[i].getAttribute('title') || '';
+    all[i].style.display = (!q || name.toLowerCase().includes(q)) ? '' : 'none';
   }
 }
 
