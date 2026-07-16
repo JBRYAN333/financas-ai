@@ -15,15 +15,95 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
     <style>
         :root {
-            --green: #22c55e;
-            --green-dark: #16a34a;
+            /* Brand */
+            --green: #10b981;
+            --green-dark: #059669;
+            --green-light: #34d399;
             --red: #ef4444;
             --blue: #3b82f6;
-            --bg: #0f172a;
-            --card: #1e293b;
-            --text: #f8fafc;
-            --text-dim: #94a3b8;
-            --border: #334155;
+            --purple: #8b5cf6;
+            --amber: #f59e0b;
+            --cyan: #06b6d4;
+            /* Surfaces */
+            --bg: #0c1222;
+            --bg-alt: #0f172a;
+            --card: #1a2332;
+            --card-hover: #1e293b;
+            --border: #2a3a4e;
+            --border-light: #334155;
+            /* Text */
+            --text: #f1f5f9;
+            --text-dim: #8899aa;
+            --text-muted: #64748b;
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 14px rgba(0,0,0,0.25);
+            --shadow-lg: 0 10px 30px rgba(0,0,0,0.35);
+            --shadow-glow: 0 0 20px rgba(16,185,129,0.15);
+            /* Radii */
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+            /* Transitions */
+            --transition-fast: 0.15s cubic-bezier(0.4,0,0.2,1);
+            --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+            --transition-slow: 0.4s cubic-bezier(0.4,0,0.2,1);
+            /* Charts */
+            --chart-line: #10b981;
+            --chart-fill: rgba(16,185,129,0.12);
+            --chart-grid: rgba(51,65,85,0.35);
+            --chart-point: #34d399;
+            --chart-text: #8899aa;
+            --chart-pie-colors: #10b981,#3b82f6,#f59e0b,#ef4444,#8b5cf6,#06b6d4,#ec4899;
+            /* Sidebar */
+            --sidebar-bg: #0a0f1a;
+            --sidebar-hover: rgba(16,185,129,0.08);
+            --sidebar-active: rgba(16,185,129,0.15);
+            /* Accent */
+            --gradient-brand: linear-gradient(135deg, #10b981, #06b6d4);
+            --gradient-green: linear-gradient(135deg, #10b981, #34d399);
+            --gradient-blue: linear-gradient(135deg, #3b82f6, #818cf8);
+            --gradient-red: linear-gradient(135deg, #ef4444, #f87171);
+            --gradient-amber: linear-gradient(135deg, #f59e0b, #fbbf24);
+        }
+        [data-theme="light"] {
+            /* Brand */
+            --green: #059669;
+            --green-dark: #047857;
+            --green-light: #10b981;
+            --red: #dc2626;
+            --blue: #2563eb;
+            --purple: #7c3aed;
+            --amber: #d97706;
+            --cyan: #0891b2;
+            /* Surfaces */
+            --bg: #f1f5f9;
+            --bg-alt: #e2e8f0;
+            --card: #ffffff;
+            --card-hover: #f8fafc;
+            --border: #d1d9e6;
+            --border-light: #e2e8f0;
+            /* Text */
+            --text: #0f172a;
+            --text-dim: #475569;
+            --text-muted: #94a3b8;
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 14px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
+            --shadow-glow: 0 0 20px rgba(5,150,105,0.12);
+            /* Charts */
+            --chart-line: #059669;
+            --chart-fill: rgba(5,150,105,0.10);
+            --chart-grid: rgba(0,0,0,0.08);
+            --chart-point: #10b981;
+            --chart-text: #475569;
+            --chart-pie-colors: #059669,#2563eb,#d97706,#dc2626,#7c3aed,#0891b2,#db2777;
+            /* Sidebar */
+            --sidebar-bg: #ffffff;
+            --sidebar-hover: rgba(5,150,105,0.06);
+            --sidebar-active: rgba(5,150,105,0.12);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
