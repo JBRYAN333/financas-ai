@@ -8,632 +8,438 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js">
+// ===== NAVEGACAO ENTRE PAGINAS =====
+function switchPage(e, page) {
+  if (e) e.preventDefault();
+  document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
+  var target = document.getElementById('pag-' + page);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('#sidebar a').forEach(function(a) { a.classList.remove('active'); });
+  var link = document.querySelector('#sidebar a[data-page="' + page + '"]');
+  if (link) link.classList.add('active');
+  // Carregar dados da pagina
+  if (page === 'categorias') renderCats();
+  else if (page === 'orcamento') { fillBgtCat(); renderBgt(); }
+  else if (page === 'metas') renderMetas();
+  else if (page === 'recorrentes') { fillRecCat(); renderRecs(); }
+  else if (page === 'insights') gerarInsights();
+}
 
-        // ===== NAVEGAÇÃO ENTRE SEÇÕES =====
-        function switchSection(e, section) {
-            if (e) e.preventDefault();
-            // Esconde todas as seções
-            document.querySelectorAll('.dashboard-section').forEach(el => el.classList.remove('active'));
-            // Mostra a seção alvo
-            const target = document.getElementById('section-' + section);
-            if (target) target.classList.add('active');
-            // Atualiza sidebar
-            document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
-            const link = document.querySelector(`.sidebar a[data-section="${section}"]`);
-            if (link) link.classList.add('active');
-            // Carrega dados da seção
-            if (section === 'categorias') renderCategories();
-            else if (section === 'orcamento') { populateBudgetCategorySelect(); renderBudgets(); }
-            else if (section === 'metas') renderGoals();
-            else if (section === 'recorrentes') { populateRecCategorySelect(); renderRecurring(); }
-            else if (section === 'insights') generateInsights();
-        }
+// ===== CATEGORIAS =====
+var CATS_DEFAULT = ['Alimentacao', 'Transporte', 'Moradia', 'Saude', 'Assinaturas', 'Educacao', 'Lazer', 'Renda', 'Outros'];
 
-        // Mostra dashboard (seção padrão) no load
-        document.addEventListener('DOMContentLoaded', () => {
-            // Dashboard é a seção padrão - já está visível
-        });
+function getCats() {
+  var c = window._cats;
+  if (c && Array.isArray(c) && c.length) return c;
+  return CATS_DEFAULT.slice();
+}
 
-        // ===== CATEGORIAS =====
-        const DEFAULT_CATEGORIES = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Assinaturas', 'Educação', 'Lazer', 'Renda', 'Outros'];
+async function carregarCats() {
+  if (!currentUser) return;
+  try {
+    var doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists && doc.data().cats && Array.isArray(doc.data().cats) && doc.data().cats.length) {
+      window._cats = doc.data().cats;
+    } else {
+      window._cats = CATS_DEFAULT.slice();
+      await db.collection('users').doc(currentUser.uid).set({ cats: CATS_DEFAULT }, { merge: true });
+    }
+  } catch(e) { window._cats = CATS_DEFAULT.slice(); }
+}
 
-        function getUserCategories() {
-            const stored = window._userCategories;
-            if (stored && Array.isArray(stored) && stored.length) return stored;
-            return [...DEFAULT_CATEGORIES];
-        }
+function renderCats() {
+  var list = document.getElementById('catList');
+  if (!list) return;
+  var cats = getCats();
+  list.innerHTML = cats.map(function(c) {
+    var isDef = CATS_DEFAULT.indexOf(c) >= 0;
+    return '<span class="cat-chip">' + c + (isDef ? '' : ' <span class="cat-rm" onclick="rmCat(\'' + c + '\')">x</span>') + '</span>';
+  }).join('');
+}
 
-        async function loadUserCategories() {
-            if (!currentUser) return;
-            try {
-                const doc = await db.collection('users').doc(currentUser.uid).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    if (data.categories && Array.isArray(data.categories) && data.categories.length) {
-                        window._userCategories = data.categories;
-                    } else {
-                        window._userCategories = [...DEFAULT_CATEGORIES];
-                        // Salva defaults no Firestore
-                        await db.collection('users').doc(currentUser.uid).set({ categories: DEFAULT_CATEGORIES }, { merge: true });
-                    }
-                } else {
-                    window._userCategories = [...DEFAULT_CATEGORIES];
-                }
-            } catch(e) {
-                console.log('loadUserCategories error:', e);
-                window._userCategories = [...DEFAULT_CATEGORIES];
-            }
-        }
+async function addCat() {
+  var input = document.getElementById('catName');
+  var name = input.value.trim();
+  if (!name) return;
+  var cats = getCats();
+  for (var i = 0; i < cats.length; i++) {
+    if (cats[i].toLowerCase() === name.toLowerCase()) {
+      document.getElementById('catStatus').textContent = 'Essa categoria ja existe.';
+      return;
+    }
+  }
+  cats.push(name);
+  window._cats = cats;
+  await db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
+  input.value = '';
+  document.getElementById('catStatus').textContent = 'Categoria "' + name + '" adicionada.';
+  renderCats();
+  fillBgtCat();
+  fillRecCat();
+}
 
-        function renderCategories() {
-            const cats = getUserCategories();
-            const list = document.getElementById('categoryList');
-            if (!list) return;
-            list.innerHTML = cats.map(c => {
-                const isDefault = DEFAULT_CATEGORIES.includes(c);
-                return `<span class="category-tag">${c}${isDefault ? '' : ' <span class="cat-remove" onclick="removeCategory(\'' + c + '\')">✕</span>'}</span>`;
-            }).join('');
-        }
+async function rmCat(name) {
+  if (CATS_DEFAULT.indexOf(name) >= 0) return;
+  var cats = getCats().filter(function(c) { return c !== name; });
+  window._cats = cats;
+  await db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
+  renderCats();
+  fillBgtCat();
+  fillRecCat();
+}
 
-        async function addCategory() {
-            const input = document.getElementById('newCategoryName');
-            const name = input.value.trim();
-            if (!name) return;
-            const cats = getUserCategories();
-            if (cats.map(x => x.toLowerCase()).includes(name.toLowerCase())) {
-                document.getElementById('categoryStatus').textContent = '❌ Essa categoria já existe.';
-                return;
-            }
-            cats.push(name);
-            window._userCategories = cats;
-            await db.collection('users').doc(currentUser.uid).set({ categories: cats }, { merge: true });
-            input.value = '';
-            document.getElementById('categoryStatus').textContent = '✅ Categoria "' + name + '" adicionada!';
-            renderCategories();
-            populateBudgetCategorySelect();
-            populateRecCategorySelect();
-            setTimeout(() => document.getElementById('categoryStatus').textContent = '', 2000);
-        }
+// ===== ORCAMENTO =====
+async function getBgt() {
+  if (!currentUser) return {};
+  try {
+    var doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists && doc.data().bgt) return doc.data().bgt;
+  } catch(e) {}
+  return {};
+}
 
-        async function removeCategory(name) {
-            if (DEFAULT_CATEGORIES.includes(name)) return;
-            let cats = getUserCategories().filter(c => c !== name);
-            window._userCategories = cats;
-            await db.collection('users').doc(currentUser.uid).set({ categories: cats }, { merge: true });
-            renderCategories();
-            populateBudgetCategorySelect();
-            populateRecCategorySelect();
-        }
+function fillBgtCat() {
+  var sel = document.getElementById('bgtCat');
+  if (!sel) return;
+  var cats = getCats().filter(function(c) { return c !== 'Renda' && c !== 'Outros'; });
+  sel.innerHTML = cats.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+}
 
-        // ===== ORÇAMENTO =====
-        async function loadBudgets() {
-            if (!currentUser) return {};
-            try {
-                const doc = await db.collection('users').doc(currentUser.uid).get();
-                if (doc.exists && doc.data().budgets) return doc.data().budgets;
-            } catch(e) {}
-            return {};
-        }
+async function setBgt() {
+  var cat = document.getElementById('bgtCat').value;
+  var val = parseFloat(document.getElementById('bgtVal').value);
+  if (!cat || !val || val <= 0) {
+    document.getElementById('bgtStatus').textContent = 'Preencha categoria e valor.';
+    return;
+  }
+  var bgt = await getBgt();
+  bgt[cat] = val;
+  await db.collection('users').doc(currentUser.uid).set({ bgt: bgt }, { merge: true });
+  window._bgtCache = bgt;
+  document.getElementById('bgtVal').value = '';
+  document.getElementById('bgtStatus').textContent = 'Orcamento salvo.';
+  renderBgt();
+}
 
-        function populateBudgetCategorySelect() {
-            const sel = document.getElementById('budgetCategory');
-            if (!sel) return;
-            const cats = getUserCategories().filter(c => c !== 'Renda' && c !== 'Outros');
-            sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-        }
+async function renderBgt() {
+  var el = document.getElementById('bgtList');
+  if (!el) return;
+  var bgt = await getBgt();
+  var entries = Object.keys(bgt);
+  if (!entries.length) {
+    el.innerHTML = '<div class="ins-empty">Nenhum orcamento definido.</div>';
+    return;
+  }
+  window._bgtCache = bgt;
+  var now = new Date();
+  var ms = new Date(now.getFullYear(), now.getMonth(), 1);
+  var me = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  var gasto = {};
+  var allT = typeof allTransactions !== 'undefined' && allTransactions ? allTransactions : [];
+  for (var i = 0; i < allT.length; i++) {
+    var t = allT[i];
+    var d = t.date && t.date.toDate ? t.date.toDate() : new Date(t.date || 0);
+    if (d >= ms && d <= me && t.type === 'saida') {
+      var cat = t.category || 'Outros';
+      var v = parseFloat(t.valueOriginal || t.value || 0);
+      var conv = v;
+      if (typeof convert === 'function') conv = convert(v, t.currency || 'BRL', userCurrency || 'BRL');
+      gasto[cat] = (gasto[cat] || 0) + conv;
+    }
+  }
+  el.innerHTML = entries.map(function(cat) {
+    var limit = bgt[cat];
+    var spent = gasto[cat] || 0;
+    var pct = limit > 0 ? (spent / limit) * 100 : 0;
+    var cls = pct >= 100 ? 'danger' : pct >= 75 ? 'warn' : 'safe';
+    return '<div class="bgt-card"><div class="bgt-hdr"><span class="bgt-name">' + cat + '</span><span class="bgt-val' + (pct >= 100 ? ' over' : '') + '">' + formatValue(spent) + ' / ' + formatValue(limit) + '</span></div><div class="bgt-bar"><div class="bgt-fill ' + cls + '" style="width:' + Math.min(pct, 100) + '%"></div></div><div class="bgt-pct">' + pct.toFixed(0) + '% utilizado</div><button class="bgt-rm" onclick="rmBgt(\'' + cat + '\')">Remover</button></div>';
+  }).join('');
+}
 
-        async function setBudget() {
-            const cat = document.getElementById('budgetCategory').value;
-            const amount = parseFloat(document.getElementById('budgetAmount').value);
-            if (!cat || !amount || amount <= 0) {
-                document.getElementById('budgetStatus').textContent = '❌ Preencha categoria e valor válido.';
-                return;
-            }
-            let budgets = await loadBudgets();
-            budgets[cat] = amount;
-            await db.collection('users').doc(currentUser.uid).set({ budgets }, { merge: true });
-            document.getElementById('budgetAmount').value = '';
-            document.getElementById('budgetStatus').textContent = '✅ Orçamento de ' + formatValue(amount) + ' para "' + cat + '" salvo!';
-            renderBudgets();
-            setTimeout(() => document.getElementById('budgetStatus').textContent = '', 2000);
-        }
+async function rmBgt(cat) {
+  var bgt = await getBgt();
+  delete bgt[cat];
+  await db.collection('users').doc(currentUser.uid).set({ bgt: bgt }, { merge: true });
+  renderBgt();
+}
 
-        async function renderBudgets() {
-            const container = document.getElementById('budgetList');
-            if (!container) return;
-            const budgets = await loadBudgets();
-            const entries = Object.entries(budgets);
-            if (!entries.length) {
-                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Nenhum orçamento definido ainda. Crie um acima.</div>';
-                return;
-            }
+// ===== METAS =====
+async function getMetas() {
+  if (!currentUser) return [];
+  try {
+    var doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists && doc.data().metas) return doc.data().metas;
+  } catch(e) {}
+  return [];
+}
 
-            // Calcula gasto real por categoria neste mês
-            const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-            let spentByCategory = {};
-            for (const t of allTransactions) {
-                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
-                if (d >= monthStart && d <= monthEnd && t.type === 'saida') {
-                    const cat = t.category || 'Outros';
-                    const v = parseFloat(t.valueOriginal || t.value || 0);
-                    const c = t.currency || 'BRL';
-                    const converted = typeof convert === 'function' ? convert(v, c, userCurrency) : v;
-                    spentByCategory[cat] = (spentByCategory[cat] || 0) + converted;
-                }
-            }
+async function addMeta() {
+  var nome = document.getElementById('metaNome').value.trim();
+  var alvo = parseFloat(document.getElementById('metaAlvo').value);
+  var prazo = document.getElementById('metaPrazo').value;
+  if (!nome || !alvo || alvo <= 0) {
+    document.getElementById('metaStatus').textContent = 'Preencha nome e valor alvo.';
+    return;
+  }
+  var metas = await getMetas();
+  metas.push({ id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: nome, target: alvo, current: 0, deadline: prazo || '', createdAt: new Date().toISOString() });
+  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
+  document.getElementById('metaNome').value = '';
+  document.getElementById('metaAlvo').value = '';
+  document.getElementById('metaPrazo').value = '';
+  document.getElementById('metaStatus').textContent = 'Meta criada.';
+  renderMetas();
+}
 
-            container.innerHTML = entries.map(([cat, limit]) => {
-                const spent = spentByCategory[cat] || 0;
-                const pct = limit > 0 ? (spent / limit) * 100 : 0;
-                const barClass = pct >= 100 ? 'danger' : pct >= 75 ? 'warn' : 'safe';
-                const over = pct >= 100 ? ' <span style="color:var(--red)">⚠️ Estourou!</span>' : '';
-                return '<div class="budget-card">' +
-                    '<div class="budget-header">' +
-                        '<span class="budget-name">' + cat + '</span>' +
-                        '<span class="budget-spent' + (pct >= 100 ? ' over' : '') + '">' + formatValue(spent) + ' / ' + formatValue(limit) + over + '</span>' +
-                    '</div>' +
-                    '<div class="budget-bar"><div class="budget-bar-fill ' + barClass + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
-                    '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem">' + pct.toFixed(0) + '% utilizado</div>' +
-                    '<div style="margin-top:0.5rem"><button onclick="removeBudget(\'' + cat + '\')" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:0.2rem 0.6rem;cursor:pointer;font-size:0.75rem">✕ Remover</button></div>' +
-                '</div>';
-            }).join('');
-        }
+async function renderMetas() {
+  var el = document.getElementById('metaList');
+  if (!el) return;
+  var metas = await getMetas();
+  if (!metas.length) {
+    el.innerHTML = '<div class="ins-empty">Nenhuma meta ainda.</div>';
+    return;
+  }
+  el.innerHTML = metas.map(function(g) {
+    var pct = g.target > 0 ? (g.current / g.target) * 100 : 0;
+    var dline = g.deadline ? new Date(g.deadline).toLocaleDateString('pt-BR') : 'Sem prazo';
+    var falta = g.target - g.current;
+    return '<div class="meta-card"><div class="meta-hdr"><div><div class="meta-name">' + g.name + '</div><div class="rec-detail">Prazo: ' + dline + '</div></div><div style="text-align:right"><div style="font-weight:700">' + formatValue(g.current) + '</div><div class="rec-detail">de ' + formatValue(g.target) + '</div></div></div><div class="meta-bar"><div class="meta-fill" style="width:' + Math.min(pct, 100) + '%"></div></div><div class="meta-stats"><span>' + pct.toFixed(0) + '%</span><span>Falta ' + (falta > 0 ? formatValue(falta) : 'Completou!') + '</span></div><div class="meta-acts"><button class="btn-dep" onclick="depMeta(\'' + g.id + '\')">Depositar</button><button onclick="editMeta(\'' + g.id + '\')">Editar</button><button class="btn-del" onclick="delMeta(\'' + g.id + '\')">Excluir</button></div></div>';
+  }).join('');
+}
 
-        async function removeBudget(cat) {
-            let budgets = await loadBudgets();
-            delete budgets[cat];
-            await db.collection('users').doc(currentUser.uid).set({ budgets }, { merge: true });
-            renderBudgets();
-        }
+async function depMeta(id) {
+  var metas = await getMetas();
+  for (var i = 0; i < metas.length; i++) {
+    if (metas[i].id === id) {
+      var val = prompt('Valor para depositar em "' + metas[i].name + '":');
+      if (val === null) return;
+      var v = parseFloat(val);
+      if (isNaN(v) || v <= 0) return;
+      metas[i].current = (metas[i].current || 0) + v;
+      break;
+    }
+  }
+  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
+  renderMetas();
+}
 
-        // ===== METAS =====
-        async function loadGoals() {
-            if (!currentUser) return [];
-            try {
-                const doc = await db.collection('users').doc(currentUser.uid).get();
-                if (doc.exists && doc.data().goals) return doc.data().goals;
-            } catch(e) {}
-            return [];
-        }
+async function editMeta(id) {
+  var metas = await getMetas();
+  for (var i = 0; i < metas.length; i++) {
+    if (metas[i].id === id) {
+      var n = prompt('Nome:', metas[i].name);
+      if (n === null) return;
+      var t = parseFloat(prompt('Valor alvo:', metas[i].target));
+      if (isNaN(t) || t <= 0) return;
+      var c = parseFloat(prompt('Valor atual:', metas[i].current));
+      if (isNaN(c) || c < 0) return;
+      metas[i].name = n.trim();
+      metas[i].target = t;
+      metas[i].current = c;
+      break;
+    }
+  }
+  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
+  renderMetas();
+}
 
-        async function addGoal() {
-            const name = document.getElementById('goalName').value.trim();
-            const target = parseFloat(document.getElementById('goalTarget').value);
-            const deadline = document.getElementById('goalDeadline').value;
-            if (!name || !target || target <= 0) {
-                document.getElementById('goalStatus').textContent = '❌ Preencha nome e valor alvo.';
-                return;
-            }
-            const goals = await loadGoals();
-            goals.push({
-                id: 'goal_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-                name: name,
-                target: target,
-                current: 0,
-                deadline: deadline || '',
-                createdAt: new Date().toISOString()
-            });
-            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
-            document.getElementById('goalName').value = '';
-            document.getElementById('goalTarget').value = '';
-            document.getElementById('goalDeadline').value = '';
-            document.getElementById('goalStatus').textContent = '✅ Meta "' + name + '" criada!';
-            renderGoals();
-            setTimeout(() => document.getElementById('goalStatus').textContent = '', 2000);
-        }
+async function delMeta(id) {
+  if (!confirm('Excluir esta meta?')) return;
+  var metas = await getMetas();
+  metas = metas.filter(function(g) { return g.id !== id; });
+  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
+  renderMetas();
+}
 
-        async function renderGoals() {
-            const container = document.getElementById('goalList');
-            if (!container) return;
-            const goals = await loadGoals();
-            if (!goals.length) {
-                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Nenhuma meta ainda. Crie sua primeira meta acima!</div>';
-                return;
-            }
+// ===== RECORRENTES =====
+function fillRecCat() {
+  var sel = document.getElementById('recCat');
+  if (!sel) return;
+  sel.innerHTML = getCats().map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+}
 
-            container.innerHTML = goals.map(g => {
-                const pct = g.target > 0 ? (g.current / g.target) * 100 : 0;
-                const currentStr = formatValue(g.current);
-                const targetStr = formatValue(g.target);
-                const deadlineStr = g.deadline ? new Date(g.deadline).toLocaleDateString('pt-BR') : 'Sem prazo';
-                const remaining = g.target - g.current;
-                const remainingStr = remaining > 0 ? formatValue(remaining) : '🎉 Completou!';
-                return '<div class="goal-card" data-goal-id="' + g.id + '">' +
-                    '<div class="goal-header">' +
-                        '<div><div class="goal-name">' + g.name + '</div><div style="font-size:0.78rem;color:var(--text-dim)">Prazo: ' + deadlineStr + '</div></div>' +
-                        '<div style="text-align:right"><div style="font-weight:700">' + currentStr + '</div><div style="font-size:0.78rem;color:var(--text-dim)">de ' + targetStr + '</div></div>' +
-                    '</div>' +
-                    '<div class="goal-progress"><div class="goal-progress-bar" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
-                    '<div class="goal-stats"><span>' + pct.toFixed(0) + '% concluído</span><span>Falta ' + remainingStr + '</span></div>' +
-                    '<div class="goal-actions">' +
-                        '<button class="goal-deposit" onclick="depositToGoal(\'' + g.id + '\')">💰 Depositar</button>' +
-                        '<button onclick="editGoal(\'' + g.id + '\')">✎ Editar</button>' +
-                        '<button onclick="deleteGoal(\'' + g.id + '\')" style="color:var(--red)">🗑 Excluir</button>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-        }
+async function getRecs() {
+  if (!currentUser) return [];
+  try {
+    var doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists && doc.data().recs) return doc.data().recs;
+  } catch(e) {}
+  return [];
+}
 
-        async function depositToGoal(id) {
-            const goals = await loadGoals();
-            const g = goals.find(x => x.id === id);
-            if (!g) return;
-            const val = prompt('Quanto quer depositar na meta "' + g.name + '"? (atual: ' + formatValue(g.current) + ')');
-            if (val === null) return;
-            const amount = parseFloat(val);
-            if (isNaN(amount) || amount <= 0) return;
-            g.current = (g.current || 0) + amount;
-            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
-            renderGoals();
-        }
+async function addRec() {
+  var desc = document.getElementById('recDesc').value.trim();
+  var val = parseFloat(document.getElementById('recVal').value);
+  var tipo = document.getElementById('recTipo').value;
+  var cat = document.getElementById('recCat').value;
+  var freq = document.getElementById('recFreq').value;
+  var dia = parseInt(document.getElementById('recDia').value) || 1;
+  if (!desc || !val || val <= 0) {
+    document.getElementById('recStatus').textContent = 'Preencha descricao e valor.';
+    return;
+  }
+  var recs = await getRecs();
+  var hoje = new Date();
+  var prox;
+  if (freq === 'monthly') { prox = new Date(hoje.getFullYear(), hoje.getMonth() + (hoje.getDate() > dia ? 1 : 0), dia); }
+  else if (freq === 'weekly') { prox = new Date(hoje); prox.setDate(hoje.getDate() + ((dia - hoje.getDay() + 7) % 7 || 7)); }
+  else { prox = new Date(hoje.getFullYear(), 0, 1); if (prox < hoje) prox = new Date(hoje.getFullYear() + 1, 0, 1); }
+  recs.push({
+    id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    desc: desc, val: val, tipo: tipo, cat: cat, freq: freq, dia: dia,
+    next: prox.toISOString().split('T')[0], ativo: true,
+    createdAt: new Date().toISOString()
+  });
+  await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
+  document.getElementById('recDesc').value = '';
+  document.getElementById('recVal').value = '';
+  document.getElementById('recDia').value = '';
+  document.getElementById('recStatus').textContent = 'Recorrente adicionada.';
+  renderRecs();
+}
 
-        async function editGoal(id) {
-            const goals = await loadGoals();
-            const g = goals.find(x => x.id === id);
-            if (!g) return;
-            const newName = prompt('Nome da meta:', g.name);
-            if (newName === null) return;
-            const newTarget = parseFloat(prompt('Valor alvo:', g.target));
-            if (isNaN(newTarget) || newTarget <= 0) return;
-            const newCurrent = parseFloat(prompt('Valor atual:', g.current));
-            if (isNaN(newCurrent) || newCurrent < 0) return;
-            g.name = newName.trim();
-            g.target = newTarget;
-            g.current = newCurrent;
-            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
-            renderGoals();
-        }
+function freqLabel(f) {
+  return f === 'monthly' ? 'Mensal' : f === 'weekly' ? 'Semanal' : 'Anual';
+}
 
-        async function deleteGoal(id) {
-            if (!confirm('Tem certeza que quer excluir esta meta?')) return;
-            let goals = await loadGoals();
-            goals = goals.filter(g => g.id !== id);
-            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
-            renderGoals();
-        }
+async function renderRecs() {
+  var el = document.getElementById('recList');
+  if (!el) return;
+  var recs = await getRecs();
+  if (!recs.length) {
+    el.innerHTML = '<div class="ins-empty">Nenhuma recorrente.</div>';
+    return;
+  }
+  el.innerHTML = recs.map(function(r) {
+    var ic = r.tipo === 'entrada' ? 'E' : 'S';
+    return '<div class="rec-item"><div style="flex:1"><div class="rec-name">' + ic + ' ' + r.desc + '</div><div class="rec-detail">' + r.cat + ' / ' + freqLabel(r.freq) + (r.freq === 'monthly' ? ' dia ' + r.dia : '') + ' / Prox: ' + (r.next ? new Date(r.next + 'T12:00:00').toLocaleDateString('pt-BR') : '-') + '</div></div><div class="rec-val">' + formatValue(r.val) + '</div><div class="rec-acts"><button class="rec-tgl' + (r.ativo ? ' on' : '') + '" onclick="tglRec(\'' + r.id + '\')" title="Ativar/Desativar"></button><button onclick="delRec(\'' + r.id + '\')" title="Excluir" style="color:var(--red)">x</button></div></div>';
+  }).join('');
+}
 
-        // ===== RECORRENTES =====
-        function populateRecCategorySelect() {
-            const sel = document.getElementById('recCategory');
-            if (!sel) return;
-            sel.innerHTML = getUserCategories().map(c => `<option value="${c}">${c}</option>`).join('');
-        }
+async function tglRec(id) {
+  var recs = await getRecs();
+  for (var i = 0; i < recs.length; i++) {
+    if (recs[i].id === id) { recs[i].ativo = !recs[i].ativo; break; }
+  }
+  await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
+  renderRecs();
+}
 
-        async function loadRecurring() {
-            if (!currentUser) return [];
-            try {
-                const doc = await db.collection('users').doc(currentUser.uid).get();
-                if (doc.exists && doc.data().recurring) return doc.data().recurring;
-            } catch(e) {}
-            return [];
-        }
+async function delRec(id) {
+  if (!confirm('Excluir recorrente?')) return;
+  var recs = await getRecs();
+  recs = recs.filter(function(r) { return r.id !== id; });
+  await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
+  renderRecs();
+}
 
-        async function addRecurring() {
-            const desc = document.getElementById('recDesc').value.trim();
-            const value = parseFloat(document.getElementById('recValue').value);
-            const type = document.getElementById('recType').value;
-            const category = document.getElementById('recCategory').value;
-            const frequency = document.getElementById('recFrequency').value;
-            const day = parseInt(document.getElementById('recDay').value) || 1;
+async function procRecs() {
+  var recs = await getRecs();
+  if (!recs.length) return;
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var mudou = false;
+  for (var i = 0; i < recs.length; i++) {
+    var r = recs[i];
+    if (!r.ativo || !r.next) continue;
+    var prox = new Date(r.next + 'T12:00:00'); prox.setHours(0,0,0,0);
+    if (prox <= hoje) {
+      var txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
+      await txRef.add({ date: firebase.firestore.Timestamp.fromDate(prox), description: r.desc, value: r.val, type: r.tipo, category: r.cat, bank: '', source: 'recurring', currency: userCurrency || 'BRL', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      var nextDate = new Date(prox);
+      if (r.freq === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
+      else if (r.freq === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+      else nextDate.setFullYear(nextDate.getFullYear() + 1);
+      r.next = nextDate.toISOString().split('T')[0];
+      mudou = true;
+    }
+  }
+  if (mudou) await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
+}
 
-            if (!desc || !value || value <= 0) {
-                document.getElementById('recStatus').textContent = '❌ Preencha descrição e valor.';
-                return;
-            }
+// ===== INSIGHTS =====
+function gerarInsights() {
+  var el = document.getElementById('insList');
+  if (!el) return;
+  var allT = typeof allTransactions !== 'undefined' && allTransactions ? allTransactions : [];
+  if (!allT.length) {
+    el.innerHTML = '<div class="ins-empty">Adicione transacoes para gerar insights.</div>';
+    return;
+  }
+  var ins = [];
+  var now = new Date();
+  var ms = new Date(now.getFullYear(), now.getMonth(), 1);
+  var me = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  var mGasto = 0, mGanho = 0;
+  var catVal = {};
+  for (var i = 0; i < allT.length; i++) {
+    var t = allT[i];
+    var d = t.date && t.date.toDate ? t.date.toDate() : new Date(t.date || 0);
+    if (d >= ms && d <= me) {
+      var v = parseFloat(t.valueOriginal || t.value || 0);
+      var conv = v;
+      if (typeof convert === 'function') conv = convert(v, t.currency || 'BRL', userCurrency || 'BRL');
+      if (t.type === 'saida') { mGasto += conv; catVal[t.category || 'Outros'] = (catVal[t.category || 'Outros'] || 0) + conv; }
+      else if (t.type === 'entrada') mGanho += conv;
+    }
+  }
+  // 1. Maior gasto
+  var cats = Object.keys(catVal);
+  if (cats.length) {
+    var top = cats.sort(function(a, b) { return catVal[b] - catVal[a]; })[0];
+    var pctT = mGasto > 0 ? ((catVal[top] / mGasto) * 100).toFixed(0) : 0;
+    ins.push({ cls: 'blue', txt: 'Maior gasto do mes: <strong>' + top + '</strong> - ' + formatValue(catVal[top]) + ' (' + pctT + '% do total).' });
+  }
+  // 2. Orcamento
+  if (window._bgtCache) {
+    for (var c in window._bgtCache) {
+      var lim = window._bgtCache[c];
+      var gast = catVal[c] || 0;
+      if (lim > 0 && gast > lim) ins.push({ cls: 'red', txt: 'Orcamento de <strong>' + c + '</strong> estourado! Gasto: ' + formatValue(gast) + ' de ' + formatValue(lim) + '.' });
+      else if (lim > 0 && gast > lim * 0.8) ins.push({ cls: 'amber', txt: 'Voce gastou ' + ((gast/lim)*100).toFixed(0) + '% do orcamento de <strong>' + c + '</strong> (' + formatValue(gast) + ' de ' + formatValue(lim) + ').' });
+    }
+  }
+  // 3. Comparativo mes anterior
+  var lms = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  var lme = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  var lmGasto = 0;
+  for (var i = 0; i < allT.length; i++) {
+    var t = allT[i];
+    var d = t.date && t.date.toDate ? t.date.toDate() : new Date(t.date || 0);
+    if (d >= lms && d <= lme && t.type === 'saida') {
+      var v = parseFloat(t.valueOriginal || t.value || 0);
+      var conv = v;
+      if (typeof convert === 'function') conv = convert(v, t.currency || 'BRL', userCurrency || 'BRL');
+      lmGasto += conv;
+    }
+  }
+  if (lmGasto > 0) {
+    var dif = mGasto - lmGasto;
+    var pctD = ((dif / lmGasto) * 100).toFixed(0);
+    if (dif > 0) ins.push({ cls: 'amber', txt: 'Gastos aumentaram <strong>' + pctD + '%</strong> vs mes passado (' + formatValue(lmGasto) + ' > ' + formatValue(mGasto) + ').' });
+    else ins.push({ cls: 'green', txt: 'Gastos diminuram <strong>' + Math.abs(pctD) + '%</strong> vs mes passado (' + formatValue(lmGasto) + ' > ' + formatValue(mGasto) + ').' });
+  }
+  // 4. Economia
+  if (mGanho > 0) {
+    var ecoPct = ((mGanho - mGasto) / mGanho * 100).toFixed(0);
+    if (ecoPct < 0) ins.push({ cls: 'red', txt: 'Voce gastou <strong>mais do que ganhou</strong> este mes! Deficit de ' + formatValue(mGasto - mGanho) + '.' });
+    else if (ecoPct < 10) ins.push({ cls: 'amber', txt: 'Taxa de economia de apenas <strong>' + ecoPct + '%</strong>. Tente poupar pelo menos 20%.' });
+    else if (ecoPct >= 20) ins.push({ cls: 'green', txt: 'Voce esta economizando <strong>' + ecoPct + '%</strong> da renda. Excelente!' });
+  }
+  if (!ins.length) {
+    el.innerHTML = '<div class="ins-empty">Poucos dados. Continue adicionando transacoes.</div>';
+    return;
+  }
+  el.innerHTML = ins.map(function(x) {
+    return '<div class="ins-card ' + x.cls + '"><div class="ins-txt">' + x.txt + '</div></div>';
+  }).join('');
+}
 
-            const rec = await loadRecurring();
-            // Calculate next date
-            const now = new Date();
-            let nextDate;
-            if (frequency === 'monthly') {
-                nextDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > day ? 1 : 0), day);
-            } else if (frequency === 'weekly') {
-                nextDate = new Date(now);
-                nextDate.setDate(now.getDate() + ((day - now.getDay() + 7) % 7 || 7));
-            } else if (frequency === 'yearly') {
-                nextDate = new Date(now.getFullYear(), day - 1, 1);
-                if (nextDate < now) nextDate = new Date(now.getFullYear() + 1, day - 1, 1);
-            } else {
-                nextDate = new Date(now);
-                nextDate.setDate(now.getDate() + 1);
-            }
-
-            rec.push({
-                id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-                description: desc,
-                value: value,
-                type: type,
-                category: category,
-                frequency: frequency,
-                day: day,
-                nextDate: nextDate.toISOString().split('T')[0],
-                active: true,
-                createdAt: new Date().toISOString()
-            });
-
-            await db.collection('users').doc(currentUser.uid).set({ recurring: rec }, { merge: true });
-            document.getElementById('recDesc').value = '';
-            document.getElementById('recValue').value = '';
-            document.getElementById('recDay').value = '';
-            document.getElementById('recStatus').textContent = '✅ Recorrente "' + desc + '" adicionada!';
-            renderRecurring();
-            setTimeout(() => document.getElementById('recStatus').textContent = '', 2000);
-        }
-
-        async function renderRecurring() {
-            const container = document.getElementById('recurringList');
-            if (!container) return;
-            const recs = await loadRecurring();
-            if (!recs.length) {
-                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Nenhuma transação recorrente. Adicione contas fixas acima que serão criadas automaticamente.</div>';
-                return;
-            }
-
-            const freqLabels = { monthly: 'Mensal', weekly: 'Semanal', yearly: 'Anual', daily: 'Diário' };
-            container.innerHTML = recs.map(r => {
-                const typeIcon = r.type === 'entrada' ? '⬱' : '⬳';
-                const valueStr = formatValue(r.value);
-                const freq = freqLabels[r.frequency] || r.frequency;
-                const dayInfo = r.frequency === 'monthly' ? 'Dia ' + r.day : (r.frequency === 'weekly' ? 'Dia da sem. ' + r.day : '');
-                const activeClass = r.active ? 'active' : '';
-                return '<div class="recurring-item">' +
-                    '<div style="flex:1">' +
-                        '<div class="ri-name">' + typeIcon + ' ' + r.description + '</div>' +
-                        '<div class="ri-detail">' + r.category + ' • ' + freq + ' ' + dayInfo + ' • Próxima: ' + (r.nextDate ? new Date(r.nextDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—') + '</div>' +
-                    '</div>' +
-                    '<div class="ri-value">' + valueStr + '</div>' +
-                    '<div class="ri-actions" style="display:flex;align-items:center;gap:0.5rem;margin-left:1rem">' +
-                        '<button class="toggle-recurring ' + activeClass + '" onclick="toggleRecurring(\'' + r.id + '\')" title="Ativar/Desativar"></button>' +
-                        '<button onclick="deleteRecurring(\'' + r.id + '\')" title="Excluir">🗑</button>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-        }
-
-        async function toggleRecurring(id) {
-            const recs = await loadRecurring();
-            const r = recs.find(x => x.id === id);
-            if (!r) return;
-            r.active = !r.active;
-            await db.collection('users').doc(currentUser.uid).set({ recurring: recs }, { merge: true });
-            renderRecurring();
-        }
-
-        async function deleteRecurring(id) {
-            if (!confirm('Excluir esta transação recorrente?')) return;
-            let recs = await loadRecurring();
-            recs = recs.filter(r => r.id !== id);
-            await db.collection('users').doc(currentUser.uid).set({ recurring: recs }, { merge: true });
-            renderRecurring();
-        }
-
-        // Auto-save recurring — rodada no load
-        async function processRecurring() {
-            // Puxa saldo geral
-            const recs = await loadRecurring();
-            if (!recs.length) return;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            let changed = false;
-
-            for (const r of recs) {
-                if (!r.active) continue;
-                if (!r.nextDate) continue;
-                const next = new Date(r.nextDate + 'T12:00:00');
-                next.setHours(0, 0, 0, 0);
-                if (next <= today) {
-                    // Cria transação automática
-                    const txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
-                    await txRef.add({
-                        date: firebase.firestore.Timestamp.fromDate(next),
-                        description: '🔄 ' + r.description,
-                        value: r.value,
-                        type: r.type,
-                        category: r.category,
-                        bank: '',
-                        source: 'recurring',
-                        currency: userCurrency || 'BRL',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    // Atualiza próxima data
-                    const nextDate = new Date(next);
-                    if (r.frequency === 'monthly') {
-                        nextDate.setMonth(nextDate.getMonth() + 1);
-                    } else if (r.frequency === 'weekly') {
-                        nextDate.setDate(nextDate.getDate() + 7);
-                    } else if (r.frequency === 'yearly') {
-                        nextDate.setFullYear(nextDate.getFullYear() + 1);
-                    } else {
-                        nextDate.setDate(nextDate.getDate() + 1);
-                    }
-                    r.nextDate = nextDate.toISOString().split('T')[0];
-                    changed = true;
-                }
-            }
-            if (changed) {
-                await db.collection('users').doc(currentUser.uid).set({ recurring: recs }, { merge: true });
-            }
-        }
-
-        // ===== INSIGHTS =====
-        function generateInsights() {
-            const container = document.getElementById('insightsList');
-            if (!container || !allTransactions || !allTransactions.length) {
-                if (container) container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Adicione transações para gerar insights.</div>';
-                return;
-            }
-
-            const insights = [];
-            const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-            // Dados do mês atual
-            let monthSpent = 0, monthEarned = 0;
-            let categorySpent = {};
-            let bankSpent = {};
-            let dailySpent = {};
-
-            for (const t of allTransactions) {
-                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
-                const v = parseFloat(t.valueOriginal || t.value || 0);
-                const c = t.currency || 'BRL';
-                const converted = typeof convert === 'function' ? convert(v, c, userCurrency) : v;
-
-                if (d >= monthStart && d <= monthEnd) {
-                    if (t.type === 'saida') {
-                        monthSpent += converted;
-                        const cat = t.category || 'Outros';
-                        categorySpent[cat] = (categorySpent[cat] || 0) + converted;
-                        const bank = t.bank || 'Outros';
-                        bankSpent[bank] = (bankSpent[bank] || 0) + converted;
-                        const dayKey = d.toISOString().split('T')[0];
-                        dailySpent[dayKey] = (dailySpent[dayKey] || 0) + converted;
-                    } else if (t.type === 'entrada') {
-                        monthEarned += converted;
-                    }
-                }
-            }
-
-            // 1. Maior gasto do mês
-            if (Object.keys(categorySpent).length) {
-                const topCat = Object.entries(categorySpent).sort((a, b) => b[1] - a[1])[0];
-                const pctOfTotal = monthSpent > 0 ? ((topCat[1] / monthSpent) * 100).toFixed(0) : 0;
-                insights.push({
-                    type: topCat[0] === 'Moradia' || topCat[0] === 'Saúde' ? 'warning' : 'info',
-                    icon: '📊',
-                    text: 'Seu maior gasto do mês foi em <strong>' + topCat[0] + '</strong>: ' + formatValue(topCat[1]) + ' (' + pctOfTotal + '% do total).',
-                    meta: 'Baseado em ' + allTransactions.length + ' transações'
-                });
-            }
-
-            // 2. Alerta de orçamento
-            const budgetsRaw = window._budgetsCache;
-            if (budgetsRaw && typeof budgetsRaw === 'object') {
-                for (const [cat, limit] of Object.entries(budgetsRaw)) {
-                    const spent = categorySpent[cat] || 0;
-                    if (limit > 0 && spent > limit) {
-                        insights.push({
-                            type: 'danger',
-                            icon: '⚠️',
-                            text: 'Você estourou o orçamento de <strong>' + cat + '</strong>! Gasto: ' + formatValue(spent) + ' de ' + formatValue(limit) + ' (' + ((spent / limit) * 100).toFixed(0) + '%).',
-                            meta: 'Considere reduzir gastos nessa categoria'
-                        });
-                    } else if (limit > 0 && spent > limit * 0.8) {
-                        insights.push({
-                            type: 'warning',
-                            icon: '⚡',
-                            text: 'Você já gastou ' + ((spent / limit) * 100).toFixed(0) + '% do orçamento de <strong>' + cat + '</strong> (' + formatValue(spent) + ' de ' + formatValue(limit) + ').',
-                            meta: 'Faltam ' + formatValue(limit - spent) + ' até o limite'
-                        });
-                    }
-                }
-            }
-
-            // 3. Comparativo com meses anteriores
-            const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-            let lastMonthSpent = 0;
-            for (const t of allTransactions) {
-                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
-                if (d >= lastMonthStart && d <= lastMonthEnd && t.type === 'saida') {
-                    const v = parseFloat(t.valueOriginal || t.value || 0);
-                    const c = t.currency || 'BRL';
-                    lastMonthSpent += typeof convert === 'function' ? convert(v, c, userCurrency) : v;
-                }
-            }
-            if (lastMonthSpent > 0) {
-                const diff = monthSpent - lastMonthSpent;
-                const pctDiff = ((diff / lastMonthSpent) * 100).toFixed(0);
-                if (diff > 0) {
-                    insights.push({
-                        type: 'warning',
-                        icon: '📈',
-                        text: 'Gastos aumentaram <strong>' + pctDiff + '%</strong> em relação ao mês passado (' + formatValue(lastMonthSpent) + ' → ' + formatValue(monthSpent) + ').',
-                        meta: 'Mês passado: ' + formatValue(lastMonthSpent)
-                    });
-                } else if (diff < 0) {
-                    insights.push({
-                        type: 'success',
-                        icon: '📉',
-                        text: 'Gastos diminuíram <strong>' + Math.abs(pctDiff) + '%</strong> em relação ao mês passado (' + formatValue(lastMonthSpent) + ' → ' + formatValue(monthSpent) + ').',
-                        meta: 'Mês passado: ' + formatValue(lastMonthSpent)
-                    });
-                }
-            }
-
-            // 4. Saldo vs receita
-            if (monthEarned > 0) {
-                const savePct = ((monthEarned - monthSpent) / monthEarned * 100).toFixed(0);
-                if (savePct < 0) {
-                    insights.push({
-                        type: 'danger',
-                        icon: '🔴',
-                        text: 'Você gastou <strong>mais do que ganhou</strong> este mês! Receita: ' + formatValue(monthEarned) + ', Gastos: ' + formatValue(monthSpent) + '.',
-                        meta: 'Déficit de ' + formatValue(monthSpent - monthEarned)
-                    });
-                } else if (savePct < 10) {
-                    insights.push({
-                        type: 'warning',
-                        icon: '💡',
-                        text: 'Sua taxa de economia é de apenas <strong>' + savePct + '%</strong>. Tente poupar pelo menos 20% da sua renda.',
-                        meta: 'Economizou ' + formatValue(monthEarned - monthSpent) + ' de ' + formatValue(monthEarned)
-                    });
-                } else if (savePct >= 20) {
-                    insights.push({
-                        type: 'success',
-                        icon: '🌟',
-                        text: 'Você está economizando <strong>' + savePct + '%</strong> da sua renda! Excelente ritmo.',
-                        meta: 'Economizou ' + formatValue(monthEarned - monthSpent) + ' de ' + formatValue(monthEarned)
-                    });
-                }
-            }
-
-            // 5. Padrões de gasto
-            const entries = Object.entries(dailySpent);
-            if (entries.length > 1) {
-                const values = entries.map(e => e[1]);
-                const avg = values.reduce((a, b) => a + b, 0) / values.length;
-                if (monthSpent > 0 && avg > 0) {
-                    const projection = avg * (now.getDate());
-                    if (projection > 0 && monthSpent > 0) {
-                        insights.push({
-                            type: 'info',
-                            icon: '🔮',
-                            text: 'Projeção de gastos até fim do mês: <strong>' + formatValue(projection) + '</strong> (média de ' + formatValue(avg) + '/dia nos últimos dias).',
-                            meta: 'Gasto atual: ' + formatValue(monthSpent)
-                        });
-                    }
-                }
-            }
-
-            if (!insights.length) {
-                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Poucos dados ainda. Continue adicionando transações para receber insights!</div>';
-                return;
-            }
-
-            container.innerHTML = insights.map(ins => {
-                const colors = { info: '#3b82f6', warning: '#f59e0b', danger: '#ef4444', success: '#10b981' };
-                return '<div class="insight-card insight-' + ins.type + '" style="border-left-color:' + (colors[ins.type] || '#3b82f6') + '">' +
-                    '<div class="insight-text">' + ins.icon + ' ' + ins.text + '</div>' +
-                    '<div class="insight-meta">' + ins.meta + '</div>' +
-                '</div>';
-            }).join('');
-        }
-
-        // ===== HOOKS — integrar com o fluxo existente =====
-        // Sobrescreve loadData para carregar categorias e processar recorrentes
-        const _originalLoadData = loadData;
-        loadData = async function() {
-            await _originalLoadData.apply(this, arguments);
-            try {
-                await loadUserCategories();
-                window._budgetsCache = await loadBudgets();
-                await processRecurring();
-            } catch(e) { console.log('Extra load error:', e); }
-        };
+// ===== HOOK no loadData =====
+var _origLoad = loadData;
+loadData = async function() {
+  await _origLoad.apply(this, arguments);
+  try { await carregarCats(); window._bgtCache = await getBgt(); await procRecs(); } catch(e) {}
+};
 
 </script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
@@ -1196,101 +1002,92 @@
             #dateFrom, #dateTo { width: 45%; }
         }
     
-        /* ===== NOVAS FEATURES ===== */
-        .section { display: none; }
-        .section.active { display: block; }
-        .dashboard-section { display: none; }
-        .dashboard-section.active { display: block; }
-        
-        /* Sidebar links de navegação */
-        .sidebar .nav-section { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; padding: 1rem 0 0.3rem; margin-top: 0.5rem; border-top: 1px solid var(--border); }
-        
-        /* Cards de meta */
-        .goal-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem 1.5rem; margin-bottom: 1rem; transition: all var(--transition); }
-        .goal-card:hover { box-shadow: var(--shadow-md); }
-        .goal-card .goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.7rem; }
-        .goal-card .goal-name { font-weight: 700; font-size: 1rem; }
-        .goal-card .goal-progress { margin: 0.5rem 0; background: var(--border); border-radius: 20px; height: 8px; overflow: hidden; }
-        .goal-card .goal-progress-bar { height: 100%; border-radius: 20px; background: var(--gradient-brand); transition: width 0.5s ease; }
-        .goal-card .goal-stats { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); }
-        .goal-card .goal-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
-        .goal-card .goal-actions button { padding: 0.3rem 0.8rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
-        .goal-card .goal-actions button:hover { background: var(--card-hover); }
-        .goal-card .goal-actions .goal-deposit { background: var(--green); color: #052e16; border: none; font-weight: 600; }
-        
-        /* Orçamento */
-        .budget-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem 1.5rem; margin-bottom: 0.8rem; transition: all var(--transition); }
-        .budget-card:hover { box-shadow: var(--shadow-sm); }
-        .budget-card .budget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
-        .budget-card .budget-name { font-weight: 600; font-size: 0.9rem; }
-        .budget-card .budget-spent { font-size: 0.85rem; }
-        .budget-card .budget-spent.over { color: var(--red); font-weight: 600; }
-        .budget-card .budget-bar { height: 6px; background: var(--border); border-radius: 10px; overflow: hidden; margin-top: 0.3rem; }
-        .budget-card .budget-bar-fill { height: 100%; border-radius: 10px; transition: width 0.4s ease; }
-        .budget-card .budget-bar-fill.safe { background: var(--green); }
-        .budget-card .budget-bar-fill.warn { background: var(--amber); }
-        .budget-card .budget-bar-fill.danger { background: var(--red); }
-        
-        /* Recorrentes */
-        .recurring-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.8rem 1.2rem; margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center; transition: all var(--transition-fast); }
-        .recurring-item:hover { border-color: var(--text-dim); }
-        .recurring-item .ri-name { font-weight: 500; }
-        .recurring-item .ri-detail { font-size: 0.78rem; color: var(--text-dim); }
-        .recurring-item .ri-value { font-weight: 600; white-space: nowrap; }
-        .recurring-item .ri-actions button { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.25rem; font-size: 0.9rem; }
-        .recurring-item .ri-actions button:hover { color: var(--red); }
-        .recurring-item .toggle-recurring { width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer; position: relative; background: var(--border); transition: background var(--transition-fast); }
-        .recurring-item .toggle-recurring.active { background: var(--green); }
-        .recurring-item .toggle-recurring::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--transition-fast); }
-        .recurring-item .toggle-recurring.active::after { transform: translateX(16px); }
-        
-        /* Modal novo + melhorias edit modal */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-        .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; }
-        .modal-box label { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 0.3rem; margin-top: 0.8rem; }
-        .modal-box input, .modal-box select { width: 100%; padding: 0.6rem 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.85rem; margin-bottom: 0.2rem; }
-        .modal-box input:focus, .modal-box select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
-        .modal-box .modal-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .modal-box .modal-actions { display: flex; gap: 0.7rem; margin-top: 1.2rem; }
-        .modal-box .modal-actions button { flex: 1; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit; font-size: 0.9rem; }
-        .modal-box .modal-actions .btn-primary { background: var(--green); color: #052e16; border: none; }
-        .modal-box .modal-actions .btn-primary:hover { filter: brightness(1.1); }
-        .modal-box .modal-actions .btn-cancel { background: var(--card); border: 1px solid var(--border); color: var(--text-dim); }
-        .modal-box .modal-actions .btn-cancel:hover { color: var(--text); }
-        
-        /* Insights */
-        .insight-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem 1.5rem; margin-bottom: 0.8rem; border-left: 4px solid; transition: all var(--transition-fast); }
-        .insight-card:hover { box-shadow: var(--shadow-sm); }
-        .insight-card.insight-info { border-left-color: var(--blue); }
-        .insight-card.insight-warning { border-left-color: var(--amber); }
-        .insight-card.insight-danger { border-left-color: var(--red); }
-        .insight-card.insight-success { border-left-color: var(--green); }
-        .insight-card .insight-icon { font-size: 1.2rem; margin-right: 0.5rem; }
-        .insight-card .insight-text { font-size: 0.9rem; line-height: 1.5; }
-        .insight-card .insight-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem; }
-        
-        /* Tags de categoria editáveis */
-        .category-tag { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(16,185,129,0.1); color: var(--green); padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.8rem; margin: 0.2rem; cursor: pointer; transition: all var(--transition-fast); }
-        .category-tag:hover { transform: scale(1.03); }
-        .category-tag .cat-remove { cursor: pointer; opacity: 0.6; font-size: 0.7rem; }
-        .category-tag .cat-remove:hover { opacity: 1; color: var(--red); }
-        .category-grid { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 1rem 0; }
-        
-        /* Badge de insight */
-        .insight-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: 500; }
-        .insight-badge.bg-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
-        .insight-badge.bg-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
-        .insight-badge.bg-red { background: rgba(239,68,68,0.15); color: var(--red); }
-        .insight-badge.bg-green { background: rgba(16,185,129,0.15); color: var(--green); }
-        
-        /* Responsivo mobile */
-        @media (max-width: 768px) {
-            .goal-card { padding: 1rem; }
-            .budget-card { padding: 0.8rem 1rem; }
-            .recurring-item { flex-wrap: wrap; gap: 0.5rem; }
-            .modal-box { padding: 1.2rem; margin: 0.5rem; }
-            .insight-card { padding: 1rem; }
-        }
+/* === NOVAS FEATURES === */
+.section-page { display: none; }
+.section-page.active { display: block; }
+
+/* Nav na sidebar */
+.nav-divider { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 1rem 0 0.3rem; margin-top: 0.3rem; border-top: 1px solid var(--border); }
+
+/* Card de categoria */
+.cat-chip { display: inline-flex; align-items: center; gap: 0.25rem; background: rgba(16,185,129,0.1); color: var(--green); padding: 0.25rem 0.65rem; border-radius: 20px; font-size: 0.8rem; margin: 0.15rem; }
+.cat-chip .cat-rm { cursor: pointer; opacity: 0.5; font-size: 0.7rem; margin-left: 0.2rem; }
+.cat-chip .cat-rm:hover { opacity: 1; color: var(--red); }
+.cat-grid { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.75rem 0; }
+
+/* Card de orçamento */
+.bgt-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem 1.5rem; margin-bottom: 0.7rem; }
+.bgt-card .bgt-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+.bgt-card .bgt-name { font-weight: 600; font-size: 0.9rem; }
+.bgt-card .bgt-val { font-size: 0.85rem; }
+.bgt-card .bgt-val.over { color: var(--red); font-weight: 600; }
+.bgt-card .bgt-bar { height: 5px; background: var(--border); border-radius: 10px; overflow: hidden; margin-top: 0.3rem; }
+.bgt-card .bgt-fill { height: 100%; border-radius: 10px; transition: width 0.4s ease; }
+.bgt-card .bgt-fill.safe { background: var(--green); }
+.bgt-card .bgt-fill.warn { background: var(--amber); }
+.bgt-card .bgt-fill.danger { background: var(--red); }
+.bgt-card .bgt-pct { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+.bgt-card .bgt-rm { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: 6px; padding: 0.15rem 0.5rem; cursor: pointer; font-size: 0.72rem; margin-top: 0.3rem; }
+.bgt-card .bgt-rm:hover { color: var(--red); }
+
+/* Meta card */
+.meta-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem 1.5rem; margin-bottom: 0.8rem; }
+.meta-card .meta-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.meta-card .meta-name { font-weight: 700; font-size: 1rem; }
+.meta-card .meta-bar { margin: 0.5rem 0; background: var(--border); border-radius: 20px; height: 7px; overflow: hidden; }
+.meta-card .meta-fill { height: 100%; border-radius: 20px; background: var(--gradient-brand); transition: width 0.5s ease; }
+.meta-card .meta-stats { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-dim); }
+.meta-card .meta-acts { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+.meta-card .meta-acts button { padding: 0.25rem 0.7rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+.meta-card .meta-acts button:hover { background: var(--card-hover); }
+.meta-card .meta-acts .btn-dep { background: var(--green); color: #052e16; border: none; font-weight: 600; }
+.meta-card .meta-acts .btn-del { color: var(--red); }
+
+/* Recorrente */
+.rec-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1.2rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+.rec-item .rec-name { font-weight: 500; }
+.rec-item .rec-detail { font-size: 0.75rem; color: var(--text-dim); }
+.rec-item .rec-val { font-weight: 600; white-space: nowrap; }
+.rec-item .rec-acts { display: flex; align-items: center; gap: 0.5rem; margin-left: 0.8rem; }
+.rec-item .rec-acts button { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.2rem; font-size: 0.85rem; }
+.rec-item .rec-acts button:hover { color: var(--red); }
+.rec-tgl { width: 34px; height: 18px; border-radius: 9px; border: none; cursor: pointer; position: relative; background: var(--border); transition: background var(--transition-fast); }
+.rec-tgl.on { background: var(--green); }
+.rec-tgl::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform var(--transition-fast); }
+.rec-tgl.on::after { transform: translateX(16px); }
+
+/* Insight */
+.ins-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem 1.5rem; margin-bottom: 0.7rem; border-left: 4px solid; }
+.ins-card.blue { border-left-color: var(--blue); }
+.ins-card.amber { border-left-color: var(--amber); }
+.ins-card.red { border-left-color: var(--red); }
+.ins-card.green { border-left-color: var(--green); }
+.ins-card .ins-txt { font-size: 0.88rem; line-height: 1.5; }
+.ins-card .ins-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; }
+
+/* Modal universal */
+.modal-wrap { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem 2rem; max-width: 460px; width: 100%; max-height: 80vh; overflow-y: auto; }
+.modal-box label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.2rem; margin-top: 0.7rem; }
+.modal-box input, .modal-box select { width: 100%; padding: 0.55rem 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.85rem; }
+.modal-box input:focus, .modal-box select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+.modal-box .modal-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem; }
+.modal-box .modal-acts { display: flex; gap: 0.7rem; margin-top: 1rem; }
+.modal-box .modal-acts button { flex: 1; padding: 0.6rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit; font-size: 0.88rem; }
+.modal-box .modal-acts .m-primary { background: var(--green); color: #052e16; border: none; }
+.modal-box .modal-acts .m-primary:hover { filter: brightness(1.1); }
+.modal-box .modal-acts .m-cancel { background: var(--card); border: 1px solid var(--border); color: var(--text-dim); }
+.modal-box .modal-acts .m-cancel:hover { color: var(--text); }
+.ins-empty { padding: 2rem; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .meta-card { padding: 1rem; }
+  .bgt-card { padding: 0.8rem 1rem; }
+  .rec-item { flex-wrap: wrap; gap: 0.4rem; }
+  .modal-box { padding: 1.2rem; margin: 0.5rem; }
+  .ins-card { padding: 0.8rem 1rem; }
+}
 
     </style>
 </head>
@@ -1310,16 +1107,14 @@
                     <div style="font-size:0.7rem;color:var(--text-dim)">inteligente</div>
                 </div>
             </div>
-            <a href="#" class="active" onclick="switchSection(event, 'dashboard')" data-section="dashboard">📊 Dashboard</a>
-            <div class="nav-section">Financeiro</div>
-            <a href="#" onclick="switchSection(event, 'dashboard')" data-section="dashboard">📊 Dashboard</a>
-            <a href="#" onclick="switchSection(event, 'categorias')" data-section="categorias">🏷️ Categorias</a>
-            <a href="#" onclick="switchSection(event, 'orcamento')" data-section="orcamento">💰 Orçamento</a>
-            <a href="#" onclick="switchSection(event, 'metas')" data-section="metas">🎯 Metas</a>
-            <a href="#" onclick="switchSection(event, 'recorrentes')" data-section="recorrentes">🔄 Recorrentes</a>
-            <a href="#" onclick="switchSection(event, 'insights')" data-section="insights">💡 Insights</a>
-            <div class="nav-section">Links</div>
-            <a href="index.html" style="gap:0"><span>📄 Início</span></a>
+            <a href="#" class="active" style="gap:0" onclick="switchPage(event,&#39;dashboard&#39;)" data-page="dashboard">Dashboard</a>            <div class="nav-divider">Gestão</div>
+            <a href="#" onclick="switchPage(event,&#39;categorias&#39;)" data-page="categorias">Categorias</a>
+            <a href="#" onclick="switchPage(event,&#39;orcamento&#39;)" data-page="orcamento">Orcamento</a>
+            <a href="#" onclick="switchPage(event,&#39;metas&#39;)" data-page="metas">Metas</a>
+            <a href="#" onclick="switchPage(event,&#39;recorrentes&#39;)" data-page="recorrentes">Recorrentes</a>
+            <a href="#" onclick="switchPage(event,&#39;insights&#39;)" data-page="insights">Insights</a>
+            <div class="nav-divider">Links</div>
+            <a href="index.html" style="gap:0">Inicio</a>
             <div class="banks-toggle" id="banksToggle" onclick="toggleBanks()">
                 <span class="arrow" id="banksArrow">▶</span>
                 <span>Bancos <span id="bankCount" style="font-size:0.65rem;color:var(--text-dim)">(0)</span></span>
@@ -1337,7 +1132,6 @@
             </div>
         </div>
         <div class="main">
-<div id="section-dashboard" class="section dashboard-section active">
             <div class="dashboard-header">
                 <h1>Dashboard</h1>
                 <p class="subtitle" id="monthLabel">Carregando...</p>
@@ -1471,106 +1265,97 @@
             </div>
 
 
-            <!-- ===== SEÇÃO CATEGORIAS ===== -->
-            <div class="section dashboard-section" id="section-categorias">
-                <div class="dashboard-header">
-                    <h1>🏷️ Categorias</h1>
-                    <p class="subtitle">Gerencie suas categorias de gasto</p>
+            <div class="section-page" id="pag-categorias">
+              <div class="dashboard-header">
+                <h1>Categorias</h1>
+                <p class="subtitle">Gerencie suas categorias de gasto</p>
+              </div>
+              <div class="add-card">
+                <h3>Nova categoria</h3>
+                <div style="display:flex;gap:0.5rem">
+                  <input type="text" id="catName" placeholder="Nome" style="flex:1;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <button onclick="addCat()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Adicionar</button>
                 </div>
-                <div class="add-card">
-                    <h3>➕ Nova categoria</h3>
-                    <div style="display:flex;gap:0.5rem">
-                        <input type="text" id="newCategoryName" placeholder="Nome da categoria" style="flex:1;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <button onclick="addCategory()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Adicionar</button>
-                    </div>
-                    <div id="categoryStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
-                </div>
-                <div class="add-card">
-                    <h3>Suas categorias</h3>
-                    <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:0.5rem">Clique no ✕ para remover. As categorias padrão não podem ser removidas.</p>
-                    <div class="category-grid" id="categoryList"></div>
-                    <div style="margin-top:0.5rem;font-size:0.78rem;color:var(--text-muted)">
-                        <strong>Padrão:</strong> Alimentação, Transporte, Moradia, Saúde, Assinaturas, Educação, Lazer, Renda, Outros
-                    </div>
-                </div>
+                <div id="catStatus" class="sub" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+              </div>
+              <div class="add-card">
+                <h3>Suas categorias</h3>
+                <p class="sub" style="font-size:0.82rem;color:var(--text-dim);margin-bottom:0.3rem">Clique no x para remover. As padrao nao podem ser removidas.</p>
+                <div class="cat-grid" id="catList"></div>
+              </div>
             </div>
 
-            <!-- ===== SEÇÃO ORÇAMENTO ===== -->
-            <div class="section dashboard-section" id="section-orcamento">
-                <div class="dashboard-header">
-                    <h1>💰 Orçamento mensal</h1>
-                    <p class="subtitle">Defina limites de gasto por categoria</p>
+            <div class="section-page" id="pag-orcamento">
+              <div class="dashboard-header">
+                <h1>Orcamento mensal</h1>
+                <p class="subtitle">Defina limites por categoria</p>
+              </div>
+              <div class="add-card">
+                <h3>Definir orcamento</h3>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                  <select id="bgtCat" style="flex:1;min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
+                  <input type="number" id="bgtVal" step="0.01" placeholder="Limite mensal" style="flex:0.5;min-width:100px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <button onclick="setBgt()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Salvar</button>
                 </div>
-                <div class="add-card">
-                    <h3>Definir orçamento</h3>
-                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-                        <select id="budgetCategory" style="flex:1;min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
-                        <input type="number" id="budgetAmount" step="0.01" placeholder="Limite mensal" style="flex:0.5;min-width:120px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <button onclick="setBudget()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Salvar</button>
-                    </div>
-                    <div id="budgetStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
-                </div>
-                <div id="budgetList"></div>
+                <div id="bgtStatus" class="sub" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+              </div>
+              <div id="bgtList"></div>
             </div>
 
-            <!-- ===== SEÇÃO METAS ===== -->
-            <div class="section dashboard-section" id="section-metas">
-                <div class="dashboard-header">
-                    <h1>🎯 Metas financeiras</h1>
-                    <p class="subtitle">Acompanhe seus objetivos de economia</p>
+            <div class="section-page" id="pag-metas">
+              <div class="dashboard-header">
+                <h1>Metas financeiras</h1>
+                <p class="subtitle">Acompanhe seus objetivos</p>
+              </div>
+              <div class="add-card">
+                <h3>Nova meta</h3>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                  <input type="text" id="metaNome" placeholder="Ex: Reserva de emergencia" style="flex:1;min-width:160px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <input type="number" id="metaAlvo" step="0.01" placeholder="Valor alvo" style="flex:0.3;min-width:100px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <input type="date" id="metaPrazo" style="flex:0.3;min-width:120px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <button onclick="addMeta()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Criar</button>
                 </div>
-                <div class="add-card">
-                    <h3>➕ Nova meta</h3>
-                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-                        <input type="text" id="goalName" placeholder="Ex: Reserva de emergência" style="flex:1;min-width:160px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <input type="number" id="goalTarget" step="0.01" placeholder="Valor alvo" style="flex:0.4;min-width:100px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <input type="date" id="goalDeadline" style="flex:0.4;min-width:130px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <button onclick="addGoal()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Criar</button>
-                    </div>
-                    <div id="goalStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
-                </div>
-                <div id="goalList"></div>
+                <div id="metaStatus" class="sub" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+              </div>
+              <div id="metaList"></div>
             </div>
 
-            <!-- ===== SEÇÃO RECORRENTES ===== -->
-            <div class="section dashboard-section" id="section-recorrentes">
-                <div class="dashboard-header">
-                    <h1>🔄 Transações recorrentes</h1>
-                    <p class="subtitle">Automatize contas fixas — aluguel, assinaturas, salário</p>
+            <div class="section-page" id="pag-recorrentes">
+              <div class="dashboard-header">
+                <h1>Transacoes recorrentes</h1>
+                <p class="subtitle">Contas fixas — aluguel, assinaturas, salario</p>
+              </div>
+              <div class="add-card">
+                <h3>Nova recorrente</h3>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                  <input type="text" id="recDesc" placeholder="Ex: Aluguel" style="flex:1;min-width:120px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <input type="number" id="recVal" step="0.01" placeholder="Valor" style="flex:0.25;min-width:80px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <select id="recTipo" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                    <option value="saida">Saida</option>
+                    <option value="entrada">Entrada</option>
+                  </select>
+                  <select id="recCat" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
+                  <select id="recFreq" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                    <option value="monthly">Mensal</option>
+                    <option value="weekly">Semanal</option>
+                    <option value="yearly">Anual</option>
+                  </select>
+                  <input type="number" id="recDia" min="1" max="31" placeholder="Dia" style="width:55px;padding:0.7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                  <button onclick="addRec()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Adicionar</button>
                 </div>
-                <div class="add-card">
-                    <h3>➕ Nova recorrente</h3>
-                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-                        <input type="text" id="recDesc" placeholder="Ex: Aluguel" style="flex:1;min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <input type="number" id="recValue" step="0.01" placeholder="Valor" style="flex:0.3;min-width:90px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <select id="recType" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                            <option value="saida">Saída</option>
-                            <option value="entrada">Entrada</option>
-                        </select>
-                        <select id="recCategory" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
-                        <select id="recFrequency" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                            <option value="monthly">Mensal</option>
-                            <option value="weekly">Semanal</option>
-                            <option value="yearly">Anual</option>
-                            <option value="daily">Diário</option>
-                        </select>
-                        <input type="number" id="recDay" min="1" max="31" placeholder="Dia" style="width:60px;padding:0.7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
-                        <button onclick="addRecurring()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Adicionar</button>
-                    </div>
-                    <div id="recStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
-                </div>
-                <div id="recurringList"></div>
+                <div id="recStatus" class="sub" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+              </div>
+              <div id="recList"></div>
             </div>
 
-            <!-- ===== SEÇÃO INSIGHTS ===== -->
-            <div class="section dashboard-section" id="section-insights">
-                <div class="dashboard-header">
-                    <h1>💡 Insights</h1>
-                    <p class="subtitle">Análises inteligentes baseadas nos seus dados</p>
-                </div>
-                <div id="insightsList">
-                    <div class="loading"><div class="loading-spinner"></div><span>Analisando seus dados...</span></div>
-                </div>
+            <div class="section-page" id="pag-insights">
+              <div class="dashboard-header">
+                <h1>Insights</h1>
+                <p class="subtitle">Analises inteligentes dos seus dados</p>
+              </div>
+              <div id="insList">
+                <div class="loading"><div class="loading-spinner"></div><span>Analisando...</span></div>
+              </div>
             </div>
 
             <div class="table-card">
