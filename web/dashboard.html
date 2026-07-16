@@ -9,21 +9,46 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js">
 // ===== NAVEGACAO ENTRE PAGINAS =====
-function switchPage(e, page) {
-  if (e) e.preventDefault();
-  document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
-  var target = document.getElementById('pag-' + page);
-  if (target) target.classList.add('active');
+function switchPage(page) {
+  // Dashboard: esconde todas as secoes novas (mostra conteudo original)
+  if (page === 'dashboard') {
+    document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
+  } else {
+    // Esconde dashboard (secao nova: mostra)
+    document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
+    var target = document.getElementById('pag-' + page);
+    if (target) target.classList.add('active');
+  }
+  // Atualiza sidebar
   document.querySelectorAll('#sidebar a').forEach(function(a) { a.classList.remove('active'); });
   var link = document.querySelector('#sidebar a[data-page="' + page + '"]');
   if (link) link.classList.add('active');
-  // Carregar dados da pagina
+  // Carrega dados da pagina
   if (page === 'categorias') renderCats();
   else if (page === 'orcamento') { fillBgtCat(); renderBgt(); }
   else if (page === 'metas') renderMetas();
   else if (page === 'recorrentes') { fillRecCat(); renderRecs(); }
   else if (page === 'insights') gerarInsights();
 }
+
+// Event delegation na sidebar
+document.addEventListener('DOMContentLoaded', function() {
+  var sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.addEventListener('click', function(e) {
+      var target = e.target;
+      // Procura o <a> mais proximo com data-page
+      while (target && target !== sidebar) {
+        if (target.tagName === 'A' && target.getAttribute('data-page')) {
+          e.preventDefault();
+          switchPage(target.getAttribute('data-page'));
+          return;
+        }
+        target = target.parentNode;
+      }
+    });
+  }
+});
 
 // ===== CATEGORIAS =====
 var CATS_DEFAULT = ['Alimentacao', 'Transporte', 'Moradia', 'Saude', 'Assinaturas', 'Educacao', 'Lazer', 'Renda', 'Outros'];
@@ -1107,12 +1132,12 @@ loadData = async function() {
                     <div style="font-size:0.7rem;color:var(--text-dim)">inteligente</div>
                 </div>
             </div>
-            <a href="#" class="active" style="gap:0" onclick="switchPage(event, this.dataset.page)" data-page="dashboard">Dashboard</a>            <div class="nav-divider">Gestão</div>
-            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="categorias">Categorias</a>
-            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="orcamento">Orcamento</a>
-            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="metas">Metas</a>
-            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="recorrentes">Recorrentes</a>
-            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="insights">Insights</a>
+            <a href="#" class="active" style="gap:0" data-page="dashboard">Dashboard</a>            <div class="nav-divider">Gestão</div>
+            <a href="#" data-page="categorias">Categorias</a>
+            <a href="#" data-page="orcamento">Orcamento</a>
+            <a href="#" data-page="metas">Metas</a>
+            <a href="#" data-page="recorrentes">Recorrentes</a>
+            <a href="#" data-page="insights">Insights</a>
             <div class="nav-divider">Links</div>
             <a href="index.html" style="gap:0">Inicio</a>
             <div class="banks-toggle" id="banksToggle" onclick="toggleBanks()">
