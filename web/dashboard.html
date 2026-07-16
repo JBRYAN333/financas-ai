@@ -2903,17 +2903,21 @@ async function rmCat(name) {
 }
 
 function openEmojiPicker(catName) {
+  var picker = document.getElementById('emojiPicker');
+  if (!picker) return;
+  picker.style.display = 'flex';
   var grid = document.getElementById('emojiGrid');
   if (!grid) return;
   grid.innerHTML = EMOJI_BANK.map(function(e) {
     return '<span class="ep-opt" onclick="selectEmoji(\'' + e + '\',\'' + catName + '\')">' + e + '</span>';
   }).join('');
-  document.getElementById('emojiPicker').classList.add('open');
+  document.getElementById('epSearch').value = '';
   document.getElementById('epSearch').value = '';
 }
 
 function closeEmojiPicker() {
-  document.getElementById('emojiPicker').classList.remove('open');
+  var picker = document.getElementById('emojiPicker');
+  if (picker) picker.style.display = 'none';
 }
 
 function selectEmoji(emoji, catName) {
@@ -3296,7 +3300,7 @@ loadData = async function() {
 </script>
 
 <!-- Emoji Picker -->
-<div id="emojiPicker" class="modal-wrap" onclick="if(event.target===this)closeEmojiPicker()">
+<div id="emojiPicker" class="modal-wrap" style="display:none" onclick="if(event.target===this)closeEmojiPicker()">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
       <h3 style="margin:0">Escolher emoji</h3>
