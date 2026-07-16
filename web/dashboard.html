@@ -7,23 +7,21 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js">
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+<script>
 // ===== NAVEGACAO ENTRE PAGINAS =====
 function switchPage(page) {
   // Dashboard: esconde todas as secoes novas (mostra conteudo original)
   if (page === 'dashboard') {
     document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
   } else {
-    // Esconde dashboard (secao nova: mostra)
     document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
     var target = document.getElementById('pag-' + page);
     if (target) target.classList.add('active');
   }
-  // Atualiza sidebar
   document.querySelectorAll('#sidebar a').forEach(function(a) { a.classList.remove('active'); });
   var link = document.querySelector('#sidebar a[data-page="' + page + '"]');
   if (link) link.classList.add('active');
-  // Carrega dados da pagina
   if (page === 'categorias') renderCats();
   else if (page === 'orcamento') { fillBgtCat(); renderBgt(); }
   else if (page === 'metas') renderMetas();
@@ -37,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
   if (sidebar) {
     sidebar.addEventListener('click', function(e) {
       var target = e.target;
-      // Procura o <a> mais proximo com data-page
       while (target && target !== sidebar) {
         if (target.tagName === 'A' && target.getAttribute('data-page')) {
           e.preventDefault();
