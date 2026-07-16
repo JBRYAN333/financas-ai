@@ -233,39 +233,91 @@
 
         .main {
             flex: 1;
-            padding: 2rem;
+            padding: 2.5rem;
             min-height: 100vh;
+            max-width: 1400px;
         }
-        .main h1 { margin-bottom: 0.5rem; letter-spacing: -0.03em; font-weight: 800; }
-        .main .subtitle { color: var(--text-dim); margin-bottom: 2rem; }
+        .main h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.15rem;
+            letter-spacing: -0.03em;
+            font-weight: 800;
+            background: var(--gradient-brand);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .main .subtitle { color: var(--text-dim); margin-bottom: 1.5rem; font-size: 0.9rem; }
+        .dashboard-header {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .dashboard-header .filter-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+        .dashboard-header select, .dashboard-header input {
+            padding: 0.5rem 0.9rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.82rem;
+            transition: all var(--transition-fast);
+        }
+        .dashboard-header select:focus, .dashboard-header input:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
+        }
 
         /* Cards */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 1.2rem;
             margin-bottom: 2rem;
         }
         .stat-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 1.2rem;
+            border-radius: var(--radius-lg);
+            padding: 1.4rem 1.5rem;
             position: relative;
             overflow: hidden;
             transition: all var(--transition);
             cursor: default;
         }
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            border-radius: 0 3px 3px 0;
         }
-        .stat-card.accent-green { border-top: 3px solid var(--green); }
-        .stat-card.accent-blue { border-top: 3px solid var(--blue); }
-        .stat-card.accent-red { border-top: 3px solid var(--red); }
-        .stat-card.accent-amber { border-top: 3px solid var(--amber); }
-        .stat-card .label { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.3rem; }
-        .stat-card .value { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+        .stat-card.accent-green::before { background: var(--green); }
+        .stat-card.accent-blue::before { background: var(--blue); }
+        .stat-card.accent-red::before { background: var(--red); }
+        .stat-card.accent-amber::before { background: var(--amber); }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+        }
+        .stat-card .label { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; padding-left: 0.5rem; }
+        .stat-card .value { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; padding-left: 0.5rem; }
         .stat-card .value.positive { color: var(--green); }
         .stat-card .value.negative { color: var(--red); }
         .stat-card .sub { font-size: 0.75rem; color: var(--text-dim); }
@@ -288,19 +340,20 @@
             transition: all var(--transition);
         }
         .chart-card:hover { box-shadow: var(--shadow-md); }
-        .chart-card h3 { margin-bottom: 1rem; font-size: 0.95rem; }
+        .chart-card h3 { margin-bottom: 1rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; }
         .chart-card canvas { max-height: 300px; }
 
         /* Add transaction */
         .add-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 1.2rem;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
             margin-bottom: 2rem;
             transition: all var(--transition);
         }
         .add-card:hover { box-shadow: var(--shadow-md); }
+        .add-card h3 { font-size: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.4rem; }
         .add-card h3 { margin-bottom: 1rem; }
         .add-form {
             display: flex;
@@ -392,7 +445,7 @@
         .edit-modal label { display: block; margin-bottom: 0.3rem; color: var(--text-dim); font-size: 0.8rem; }
         .edit-modal .btn-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
         .edit-modal .btn-row button { flex: 1; padding: 0.7rem; border-radius: var(--radius-sm); cursor: pointer; font-family: inherit; font-weight: 600; }
-        .edit-modal .save-btn { background: var(--green); color: #052e16; border: none; }
+        .edit-modal .save-btn { background: var(--gradient-green); color: #fff; border: none; }
         .edit-modal .cancel-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); }
 
         /* Loading */
@@ -549,25 +602,26 @@
             </div>
         </div>
         <div class="main">
-            <h1>Dashboard</h1>
-            <p class="subtitle" id="monthLabel">Carregando...</p>
-
-            <div style="display:flex;gap:0.7rem;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap">
-                <select id="filterPeriod" onchange="applyPeriod()" style="padding:0.5rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem">
-                    <option value="all">Tudo</option>
-                    <option value="current">Este mês</option>
-                    <option value="last">Mês passado</option>
-                    <option value="3m">Últimos 3 meses</option>
-                    <option value="6m">Últimos 6 meses</option>
-                    <option value="12m">Últimos 12 meses</option>
-                    <option value="custom">Personalizado...</option>
-                </select>
-                <input type="date" id="dateFrom" onchange="applyPeriod()" style="padding:0.5rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem;display:none">
-                <span id="dateSep" style="color:var(--text-dim);display:none">→</span>
-                <input type="date" id="dateTo" onchange="applyPeriod()" style="padding:0.5rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem;display:none">
-                <select id="filterBank" onchange="applyFilters()" style="padding:0.5rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem">
-                    <option value="">Todos os bancos</option>
-                </select>
+            <div class="dashboard-header">
+                <h1>Dashboard</h1>
+                <p class="subtitle" id="monthLabel">Carregando...</p>
+                <div class="filter-row">
+                    <select id="filterPeriod" onchange="applyPeriod()">
+                        <option value="all">📊 Tudo</option>
+                        <option value="current">📅 Este mês</option>
+                        <option value="last">📅 Mês passado</option>
+                        <option value="3m">📅 Últimos 3 meses</option>
+                        <option value="6m">📅 Últimos 6 meses</option>
+                        <option value="12m">📅 Últimos 12 meses</option>
+                        <option value="custom">📅 Personalizado...</option>
+                    </select>
+                    <input type="date" id="dateFrom" onchange="applyPeriod()" style="display:none">
+                    <span id="dateSep" style="color:var(--text-dim);display:none">→</span>
+                    <input type="date" id="dateTo" onchange="applyPeriod()" style="display:none">
+                    <select id="filterBank" onchange="applyFilters()">
+                        <option value="">🏦 Todos os bancos</option>
+                    </select>
+                </div>
             </div>
 
             <div class="stats-grid">
