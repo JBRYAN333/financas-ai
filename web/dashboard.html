@@ -1107,12 +1107,12 @@ loadData = async function() {
                     <div style="font-size:0.7rem;color:var(--text-dim)">inteligente</div>
                 </div>
             </div>
-            <a href="#" class="active" style="gap:0" onclick="switchPage(event,&#39;dashboard&#39;)" data-page="dashboard">Dashboard</a>            <div class="nav-divider">Gestão</div>
-            <a href="#" onclick="switchPage(event,&#39;categorias&#39;)" data-page="categorias">Categorias</a>
-            <a href="#" onclick="switchPage(event,&#39;orcamento&#39;)" data-page="orcamento">Orcamento</a>
-            <a href="#" onclick="switchPage(event,&#39;metas&#39;)" data-page="metas">Metas</a>
-            <a href="#" onclick="switchPage(event,&#39;recorrentes&#39;)" data-page="recorrentes">Recorrentes</a>
-            <a href="#" onclick="switchPage(event,&#39;insights&#39;)" data-page="insights">Insights</a>
+            <a href="#" class="active" style="gap:0" onclick="switchPage(event, this.dataset.page)" data-page="dashboard">Dashboard</a>            <div class="nav-divider">Gestão</div>
+            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="categorias">Categorias</a>
+            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="orcamento">Orcamento</a>
+            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="metas">Metas</a>
+            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="recorrentes">Recorrentes</a>
+            <a href="#" onclick="switchPage(event, this.dataset.page)" data-page="insights">Insights</a>
             <div class="nav-divider">Links</div>
             <a href="index.html" style="gap:0">Inicio</a>
             <div class="banks-toggle" id="banksToggle" onclick="toggleBanks()">
