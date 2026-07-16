@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>FAI — Finanças Inteligentes</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -572,6 +575,34 @@
 /* === NOVAS FEATURES === */
 .section-page { display: none; }
 .section-page.active { display: block; }
+
+.ep-opt {
+  font-size: 1.6rem;
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 8px;
+  transition: background 0.15s;
+  line-height: 1;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ep-opt:hover { background: var(--border); }
+.cat-chip .cat-emoji-btn {
+  font-size: 0.65rem;
+  cursor: pointer;
+  opacity: 0.4;
+  margin-left: 0.2rem;
+  transition: opacity 0.15s;
+  display: inline-block;
+}
+.cat-chip:hover .cat-emoji-btn { opacity: 0.8; }
+.cat-chip.cat-ent { border-color: var(--green); background: rgba(34,197,94,0.08); }
+#emojiGrid::-webkit-scrollbar { width: 4px; }
+#emojiGrid::-webkit-scrollbar-track { background: transparent; }
+#emojiGrid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 /* Nav na sidebar */
 .nav-divider { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 1rem 0 0.3rem; margin-top: 0.3rem; border-top: 1px solid var(--border); }
@@ -2727,14 +2758,10 @@
 
 // ===== NAVEGACAO ENTRE PAGINAS =====
 function switchPage(page) {
-  // Dashboard: esconde todas as secoes novas (mostra conteudo original)
-  if (page === 'dashboard') {
-    document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
-  } else {
-    document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
-    var target = document.getElementById('pag-' + page);
-    if (target) target.classList.add('active');
-  }
+  // Esconde todas e mostra a seção alvo
+  document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
+  var target = document.getElementById('pag-' + page);
+  if (target) target.classList.add('active');
   document.querySelectorAll('#sidebar a').forEach(function(a) { a.classList.remove('active'); });
   var link = document.querySelector('#sidebar a[data-page="' + page + '"]');
   if (link) link.classList.add('active');
@@ -2764,12 +2791,34 @@ function switchPage(page) {
 })();
 
 // ===== CATEGORIAS =====
-var CATS_DEFAULT = ['Alimentacao', 'Transporte', 'Moradia', 'Saude', 'Assinaturas', 'Educacao', 'Lazer', 'Renda', 'Outros'];
+var CATS_DEFAULT = [
+  {name:'Alimentacao', emoji:'🍎', type:'saida'},
+  {name:'Transporte', emoji:'🚗', type:'saida'},
+  {name:'Moradia', emoji:'🏠', type:'saida'},
+  {name:'Saude', emoji:'💊', type:'saida'},
+  {name:'Assinaturas', emoji:'📦', type:'saida'},
+  {name:'Educacao', emoji:'📚', type:'saida'},
+  {name:'Lazer', emoji:'🎮', type:'saida'},
+  {name:'Renda', emoji:'💰', type:'entrada'},
+  {name:'Outros', emoji:'📋', type:'saida'}
+];
+
+var EMOJI_BANK = ['🍎','🚗','🏠','💊','📦','📚','🎮','💰','📋','🏦','💼','📈','🛒','🔧','🏪','⚡','📱','🌐','💧','🏡','🐾','👕','✈️','🎭','🎂','💳','🏧','💵','📊','🏢','🔥','🎵','🏋️','🧘','🎨','📝','🐱','🍕','☕','🍺','🌮','🧊','🎯','🧠','💡','🔐','🎒','🔔','📷','💻','🔋','🌿','🛏️','🚿','🩺','⚕️'];
 
 function getCats() {
-  var c = window._cats;
+  var c = window.__catsCache;
   if (c && Array.isArray(c) && c.length) return c;
-  return CATS_DEFAULT.slice();
+  if (currentUser && currentUser.cats && Array.isArray(currentUser.cats) && currentUser.cats.length) {
+    c = currentUser.cats;
+  } else {
+    return CATS_DEFAULT;
+  }
+  // Normalize - handle both {name,emoji,type} objects and plain strings
+  if (typeof c[0] === 'string') {
+    c = c.map(function(n) { return {name:n, emoji:'📋', type:'saida'}; });
+  }
+  window.__catsCache = c;
+  return c;
 }
 
 async function carregarCats() {
@@ -2777,12 +2826,20 @@ async function carregarCats() {
   try {
     var doc = await db.collection('users').doc(currentUser.uid).get();
     if (doc.exists && doc.data().cats && Array.isArray(doc.data().cats) && doc.data().cats.length) {
-      window._cats = doc.data().cats;
+      var raw = doc.data().cats;
+      var cats = [];
+      for (var i = 0; i < raw.length; i++) {
+        if (typeof raw[i] === 'string') { cats.push({name:raw[i], emoji:'📋', type:'saida'}); }
+        else { cats.push(raw[i]); }
+      }
+      currentUser.cats = cats;
+      window.__catsCache = cats;
     } else {
-      window._cats = CATS_DEFAULT.slice();
+      window.__catsCache = CATS_DEFAULT.slice();
+      currentUser.cats = CATS_DEFAULT.slice();
       await db.collection('users').doc(currentUser.uid).set({ cats: CATS_DEFAULT }, { merge: true });
     }
-  } catch(e) { window._cats = CATS_DEFAULT.slice(); }
+  } catch(e) { window.__catsCache = CATS_DEFAULT.slice(); }
 }
 
 function renderCats() {
@@ -2790,8 +2847,13 @@ function renderCats() {
   if (!list) return;
   var cats = getCats();
   list.innerHTML = cats.map(function(c) {
-    var isDef = CATS_DEFAULT.indexOf(c) >= 0;
-    return '<span class="cat-chip">' + c + (isDef ? '' : ' <span class="cat-rm" onclick="rmCat(\'' + c + '\')">x</span>') + '</span>';
+    var nm = c.name || c;
+    var em = c.emoji || '📋';
+    var isDef = false;
+    for (var i = 0; i < CATS_DEFAULT.length; i++) {
+      if (CATS_DEFAULT[i].name === nm) { isDef = true; break; }
+    }
+    return '<span class="cat-chip" data-name="' + nm + '">' + em + ' ' + nm + (isDef ? '' : ' <span class="cat-rm" onclick="rmCat(\'' + nm + '\')">x</span>') + '<span class="cat-emoji-btn" onclick="pickEmoji(\'' + nm + '\')" title="Trocar emoji">\uD83C\uDFF7</span></span>';
   }).join('');
 }
 
@@ -2801,386 +2863,92 @@ async function addCat() {
   if (!name) return;
   var cats = getCats();
   for (var i = 0; i < cats.length; i++) {
-    if (cats[i].toLowerCase() === name.toLowerCase()) {
+    if ((cats[i].name || cats[i]).toLowerCase() === name.toLowerCase()) {
       document.getElementById('catStatus').textContent = 'Essa categoria ja existe.';
       return;
     }
   }
-  cats.push(name);
-  window._cats = cats;
-  await db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
-  input.value = '';
-  document.getElementById('catStatus').textContent = 'Categoria "' + name + '" adicionada.';
-  renderCats();
-  fillBgtCat();
-  fillRecCat();
+  // Open emoji picker modal for new category
+  openEmojiPicker(function(emoji) {
+    cats.push({name:name, emoji:emoji, type:'saida'});
+    window.__catsCache = cats;
+    currentUser.cats = cats;
+    db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true }).then(function() {
+      input.value = '';
+      document.getElementById('catStatus').textContent = 'Categoria "' + name + '" adicionada.';
+      renderCats();
+      fillBgtCat();
+      fillRecCat();
+    });
+  });
 }
 
 async function rmCat(name) {
-  if (CATS_DEFAULT.indexOf(name) >= 0) return;
-  var cats = getCats().filter(function(c) { return c !== name; });
-  window._cats = cats;
+  var isDef = false;
+  for (var i = 0; i < CATS_DEFAULT.length; i++) {
+    if (CATS_DEFAULT[i].name === name) { isDef = true; break; }
+  }
+  if (isDef) return;
+  var cats = getCats().filter(function(c) { return (c.name || c) !== name; });
+  window.__catsCache = cats;
+  currentUser.cats = cats;
   await db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
   renderCats();
   fillBgtCat();
   fillRecCat();
 }
 
-// ===== ORCAMENTO =====
-async function getBgt() {
-  if (!currentUser) return {};
-  try {
-    var doc = await db.collection('users').doc(currentUser.uid).get();
-    if (doc.exists && doc.data().bgt) return doc.data().bgt;
-  } catch(e) {}
-  return {};
-}
+// ===== EMOJI PICKER =====
+var _emojiCallback = null;
 
-function fillBgtCat() {
-  var sel = document.getElementById('bgtCat');
-  if (!sel) return;
-  var cats = getCats().filter(function(c) { return c !== 'Renda' && c !== 'Outros'; });
-  sel.innerHTML = cats.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
-}
-
-async function setBgt() {
-  var cat = document.getElementById('bgtCat').value;
-  var val = parseFloat(document.getElementById('bgtVal').value);
-  if (!cat || !val || val <= 0) {
-    document.getElementById('bgtStatus').textContent = 'Preencha categoria e valor.';
-    return;
-  }
-  var bgt = await getBgt();
-  bgt[cat] = val;
-  await db.collection('users').doc(currentUser.uid).set({ bgt: bgt }, { merge: true });
-  window._bgtCache = bgt;
-  document.getElementById('bgtVal').value = '';
-  document.getElementById('bgtStatus').textContent = 'Orcamento salvo.';
-  renderBgt();
-}
-
-async function renderBgt() {
-  var el = document.getElementById('bgtList');
-  if (!el) return;
-  var bgt = await getBgt();
-  var entries = Object.keys(bgt);
-  if (!entries.length) {
-    el.innerHTML = '<div class="ins-empty">Nenhum orcamento definido.</div>';
-    return;
-  }
-  window._bgtCache = bgt;
-  var now = new Date();
-  var ms = new Date(now.getFullYear(), now.getMonth(), 1);
-  var me = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  var gasto = {};
-  var allT = typeof allTransactions !== 'undefined' && allTransactions ? allTransactions : [];
-  for (var i = 0; i < allT.length; i++) {
-    var t = allT[i];
-    var d = t.date && t.date.toDate ? t.date.toDate() : new Date(t.date || 0);
-    if (d >= ms && d <= me && t.type === 'saida') {
-      var cat = t.category || 'Outros';
-      var v = parseFloat(t.valueOriginal || t.value || 0);
-      var conv = v;
-      if (typeof convert === 'function') conv = convert(v, t.currency || 'BRL', userCurrency || 'BRL');
-      gasto[cat] = (gasto[cat] || 0) + conv;
-    }
-  }
-  el.innerHTML = entries.map(function(cat) {
-    var limit = bgt[cat];
-    var spent = gasto[cat] || 0;
-    var pct = limit > 0 ? (spent / limit) * 100 : 0;
-    var cls = pct >= 100 ? 'danger' : pct >= 75 ? 'warn' : 'safe';
-    return '<div class="bgt-card"><div class="bgt-hdr"><span class="bgt-name">' + cat + '</span><span class="bgt-val' + (pct >= 100 ? ' over' : '') + '">' + formatValue(spent) + ' / ' + formatValue(limit) + '</span></div><div class="bgt-bar"><div class="bgt-fill ' + cls + '" style="width:' + Math.min(pct, 100) + '%"></div></div><div class="bgt-pct">' + pct.toFixed(0) + '% utilizado</div><button class="bgt-rm" onclick="rmBgt(\'' + cat + '\')">Remover</button></div>';
+function openEmojiPicker(callback) {
+  _emojiCallback = callback;
+  var grid = document.getElementById('emojiGrid');
+  if (!grid) return;
+  grid.innerHTML = EMOJI_BANK.map(function(e) {
+    return '<span class="ep-opt" onclick="selectEmoji(\'' + e + '\')">' + e + '</span>';
   }).join('');
+  document.getElementById('emojiPicker').classList.add('open');
+  document.getElementById('epSearch').value = '';
 }
 
-async function rmBgt(cat) {
-  var bgt = await getBgt();
-  delete bgt[cat];
-  await db.collection('users').doc(currentUser.uid).set({ bgt: bgt }, { merge: true });
-  renderBgt();
+function closeEmojiPicker() {
+  document.getElementById('emojiPicker').classList.remove('open');
+  _emojiCallback = null;
 }
 
-// ===== METAS =====
-async function getMetas() {
-  if (!currentUser) return [];
-  try {
-    var doc = await db.collection('users').doc(currentUser.uid).get();
-    if (doc.exists && doc.data().metas) return doc.data().metas;
-  } catch(e) {}
-  return [];
+function selectEmoji(emoji) {
+  if (_emojiCallback) _emojiCallback(emoji);
+  closeEmojiPicker();
 }
 
-async function addMeta() {
-  var nome = document.getElementById('metaNome').value.trim();
-  var alvo = parseFloat(document.getElementById('metaAlvo').value);
-  var prazo = document.getElementById('metaPrazo').value;
-  if (!nome || !alvo || alvo <= 0) {
-    document.getElementById('metaStatus').textContent = 'Preencha nome e valor alvo.';
-    return;
+function filterEmojiPicker() {
+  var q = document.getElementById('epSearch').value.toLowerCase().trim();
+  var all = document.querySelectorAll('#emojiGrid .ep-opt');
+  for (var i = 0; i < all.length; i++) {
+    all[i].style.display = (!q || all[i].textContent.toLowerCase().includes(q)) ? '' : 'none';
   }
-  var metas = await getMetas();
-  metas.push({ id: 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: nome, target: alvo, current: 0, deadline: prazo || '', createdAt: new Date().toISOString() });
-  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
-  document.getElementById('metaNome').value = '';
-  document.getElementById('metaAlvo').value = '';
-  document.getElementById('metaPrazo').value = '';
-  document.getElementById('metaStatus').textContent = 'Meta criada.';
-  renderMetas();
 }
 
-async function renderMetas() {
-  var el = document.getElementById('metaList');
-  if (!el) return;
-  var metas = await getMetas();
-  if (!metas.length) {
-    el.innerHTML = '<div class="ins-empty">Nenhuma meta ainda.</div>';
-    return;
+function pickEmoji(catName) {
+  // Find current emoji for this category
+  var cats = getCats();
+  var curEmoji = '📋';
+  for (var i = 0; i < cats.length; i++) {
+    if ((cats[i].name || cats[i]) === catName) { curEmoji = cats[i].emoji || '📋'; break; }
   }
-  el.innerHTML = metas.map(function(g) {
-    var pct = g.target > 0 ? (g.current / g.target) * 100 : 0;
-    var dline = g.deadline ? new Date(g.deadline).toLocaleDateString('pt-BR') : 'Sem prazo';
-    var falta = g.target - g.current;
-    return '<div class="meta-card"><div class="meta-hdr"><div><div class="meta-name">' + g.name + '</div><div class="rec-detail">Prazo: ' + dline + '</div></div><div style="text-align:right"><div style="font-weight:700">' + formatValue(g.current) + '</div><div class="rec-detail">de ' + formatValue(g.target) + '</div></div></div><div class="meta-bar"><div class="meta-fill" style="width:' + Math.min(pct, 100) + '%"></div></div><div class="meta-stats"><span>' + pct.toFixed(0) + '%</span><span>Falta ' + (falta > 0 ? formatValue(falta) : 'Completou!') + '</span></div><div class="meta-acts"><button class="btn-dep" onclick="depMeta(\'' + g.id + '\')">Depositar</button><button onclick="editMeta(\'' + g.id + '\')">Editar</button><button class="btn-del" onclick="delMeta(\'' + g.id + '\')">Excluir</button></div></div>';
-  }).join('');
-}
-
-async function depMeta(id) {
-  var metas = await getMetas();
-  for (var i = 0; i < metas.length; i++) {
-    if (metas[i].id === id) {
-      var val = prompt('Valor para depositar em "' + metas[i].name + '":');
-      if (val === null) return;
-      var v = parseFloat(val);
-      if (isNaN(v) || v <= 0) return;
-      metas[i].current = (metas[i].current || 0) + v;
-      break;
+  openEmojiPicker(function(newEmoji) {
+    var cats = getCats();
+    for (var i = 0; i < cats.length; i++) {
+      if ((cats[i].name || cats[i]) === catName) {
+        cats[i].emoji = newEmoji;
+        break;
+      }
     }
-  }
-  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
-  renderMetas();
-}
-
-async function editMeta(id) {
-  var metas = await getMetas();
-  for (var i = 0; i < metas.length; i++) {
-    if (metas[i].id === id) {
-      var n = prompt('Nome:', metas[i].name);
-      if (n === null) return;
-      var t = parseFloat(prompt('Valor alvo:', metas[i].target));
-      if (isNaN(t) || t <= 0) return;
-      var c = parseFloat(prompt('Valor atual:', metas[i].current));
-      if (isNaN(c) || c < 0) return;
-      metas[i].name = n.trim();
-      metas[i].target = t;
-      metas[i].current = c;
-      break;
-    }
-  }
-  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
-  renderMetas();
-}
-
-async function delMeta(id) {
-  if (!confirm('Excluir esta meta?')) return;
-  var metas = await getMetas();
-  metas = metas.filter(function(g) { return g.id !== id; });
-  await db.collection('users').doc(currentUser.uid).set({ metas: metas }, { merge: true });
-  renderMetas();
-}
-
-// ===== RECORRENTES =====
-function fillRecCat() {
-  var sel = document.getElementById('recCat');
-  if (!sel) return;
-  sel.innerHTML = getCats().map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
-}
-
-async function getRecs() {
-  if (!currentUser) return [];
-  try {
-    var doc = await db.collection('users').doc(currentUser.uid).get();
-    if (doc.exists && doc.data().recs) return doc.data().recs;
-  } catch(e) {}
-  return [];
-}
-
-async function addRec() {
-  var desc = document.getElementById('recDesc').value.trim();
-  var val = parseFloat(document.getElementById('recVal').value);
-  var tipo = document.getElementById('recTipo').value;
-  var cat = document.getElementById('recCat').value;
-  var freq = document.getElementById('recFreq').value;
-  var dia = parseInt(document.getElementById('recDia').value) || 1;
-  if (!desc || !val || val <= 0) {
-    document.getElementById('recStatus').textContent = 'Preencha descricao e valor.';
-    return;
-  }
-  var recs = await getRecs();
-  var hoje = new Date();
-  var prox;
-  if (freq === 'monthly') { prox = new Date(hoje.getFullYear(), hoje.getMonth() + (hoje.getDate() > dia ? 1 : 0), dia); }
-  else if (freq === 'weekly') { prox = new Date(hoje); prox.setDate(hoje.getDate() + ((dia - hoje.getDay() + 7) % 7 || 7)); }
-  else { prox = new Date(hoje.getFullYear(), 0, 1); if (prox < hoje) prox = new Date(hoje.getFullYear() + 1, 0, 1); }
-  recs.push({
-    id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-    desc: desc, val: val, tipo: tipo, cat: cat, freq: freq, dia: dia,
-    next: prox.toISOString().split('T')[0], ativo: true,
-    createdAt: new Date().toISOString()
+    window.__catsCache = cats;
+    currentUser.cats = cats;
+    db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
+    renderCats();
   });
-  await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
-  document.getElementById('recDesc').value = '';
-  document.getElementById('recVal').value = '';
-  document.getElementById('recDia').value = '';
-  document.getElementById('recStatus').textContent = 'Recorrente adicionada.';
-  renderRecs();
 }
-
-function freqLabel(f) {
-  return f === 'monthly' ? 'Mensal' : f === 'weekly' ? 'Semanal' : 'Anual';
-}
-
-async function renderRecs() {
-  var el = document.getElementById('recList');
-  if (!el) return;
-  var recs = await getRecs();
-  if (!recs.length) {
-    el.innerHTML = '<div class="ins-empty">Nenhuma recorrente.</div>';
-    return;
-  }
-  el.innerHTML = recs.map(function(r) {
-    var ic = r.tipo === 'entrada' ? 'E' : 'S';
-    return '<div class="rec-item"><div style="flex:1"><div class="rec-name">' + ic + ' ' + r.desc + '</div><div class="rec-detail">' + r.cat + ' / ' + freqLabel(r.freq) + (r.freq === 'monthly' ? ' dia ' + r.dia : '') + ' / Prox: ' + (r.next ? new Date(r.next + 'T12:00:00').toLocaleDateString('pt-BR') : '-') + '</div></div><div class="rec-val">' + formatValue(r.val) + '</div><div class="rec-acts"><button class="rec-tgl' + (r.ativo ? ' on' : '') + '" onclick="tglRec(\'' + r.id + '\')" title="Ativar/Desativar"></button><button onclick="delRec(\'' + r.id + '\')" title="Excluir" style="color:var(--red)">x</button></div></div>';
-  }).join('');
-}
-
-async function tglRec(id) {
-  var recs = await getRecs();
-  for (var i = 0; i < recs.length; i++) {
-    if (recs[i].id === id) { recs[i].ativo = !recs[i].ativo; break; }
-  }
-  await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
-  renderRecs();
-}
-
-async function delRec(id) {
-  if (!confirm('Excluir recorrente?')) return;
-  var recs = await getRecs();
-  recs = recs.filter(function(r) { return r.id !== id; });
-  await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
-  renderRecs();
-}
-
-async function procRecs() {
-  var recs = await getRecs();
-  if (!recs.length) return;
-  var hoje = new Date(); hoje.setHours(0,0,0,0);
-  var mudou = false;
-  for (var i = 0; i < recs.length; i++) {
-    var r = recs[i];
-    if (!r.ativo || !r.next) continue;
-    var prox = new Date(r.next + 'T12:00:00'); prox.setHours(0,0,0,0);
-    if (prox <= hoje) {
-      var txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
-      await txRef.add({ date: firebase.firestore.Timestamp.fromDate(prox), description: r.desc, value: r.val, type: r.tipo, category: r.cat, bank: '', source: 'recurring', currency: userCurrency || 'BRL', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      var nextDate = new Date(prox);
-      if (r.freq === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
-      else if (r.freq === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-      else nextDate.setFullYear(nextDate.getFullYear() + 1);
-      r.next = nextDate.toISOString().split('T')[0];
-      mudou = true;
-    }
-  }
-  if (mudou) await db.collection('users').doc(currentUser.uid).set({ recs: recs }, { merge: true });
-}
-
-// ===== INSIGHTS =====
-function gerarInsights() {
-  var el = document.getElementById('insList');
-  if (!el) return;
-  var allT = typeof allTransactions !== 'undefined' && allTransactions ? allTransactions : [];
-  if (!allT.length) {
-    el.innerHTML = '<div class="ins-empty">Adicione transacoes para gerar insights.</div>';
-    return;
-  }
-  var ins = [];
-  var now = new Date();
-  var ms = new Date(now.getFullYear(), now.getMonth(), 1);
-  var me = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  var mGasto = 0, mGanho = 0;
-  var catVal = {};
-  for (var i = 0; i < allT.length; i++) {
-    var t = allT[i];
-    var d = t.date && t.date.toDate ? t.date.toDate() : new Date(t.date || 0);
-    if (d >= ms && d <= me) {
-      var v = parseFloat(t.valueOriginal || t.value || 0);
-      var conv = v;
-      if (typeof convert === 'function') conv = convert(v, t.currency || 'BRL', userCurrency || 'BRL');
-      if (t.type === 'saida') { mGasto += conv; catVal[t.category || 'Outros'] = (catVal[t.category || 'Outros'] || 0) + conv; }
-      else if (t.type === 'entrada') mGanho += conv;
-    }
-  }
-  // 1. Maior gasto
-  var cats = Object.keys(catVal);
-  if (cats.length) {
-    var top = cats.sort(function(a, b) { return catVal[b] - catVal[a]; })[0];
-    var pctT = mGasto > 0 ? ((catVal[top] / mGasto) * 100).toFixed(0) : 0;
-    ins.push({ cls: 'blue', txt: 'Maior gasto do mes: <strong>' + top + '</strong> - ' + formatValue(catVal[top]) + ' (' + pctT + '% do total).' });
-  }
-  // 2. Orcamento
-  if (window._bgtCache) {
-    for (var c in window._bgtCache) {
-      var lim = window._bgtCache[c];
-      var gast = catVal[c] || 0;
-      if (lim > 0 && gast > lim) ins.push({ cls: 'red', txt: 'Orcamento de <strong>' + c + '</strong> estourado! Gasto: ' + formatValue(gast) + ' de ' + formatValue(lim) + '.' });
-      else if (lim > 0 && gast > lim * 0.8) ins.push({ cls: 'amber', txt: 'Voce gastou ' + ((gast/lim)*100).toFixed(0) + '% do orcamento de <strong>' + c + '</strong> (' + formatValue(gast) + ' de ' + formatValue(lim) + ').' });
-    }
-  }
-  // 3. Comparativo mes anterior
-  var lms = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  var lme = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-  var lmGasto = 0;
-  for (var i = 0; i < allT.length; i++) {
-    var t = allT[i];
-    var d = t.date && t.date.toDate ? t.date.toDate() : new Date(t.date || 0);
-    if (d >= lms && d <= lme && t.type === 'saida') {
-      var v = parseFloat(t.valueOriginal || t.value || 0);
-      var conv = v;
-      if (typeof convert === 'function') conv = convert(v, t.currency || 'BRL', userCurrency || 'BRL');
-      lmGasto += conv;
-    }
-  }
-  if (lmGasto > 0) {
-    var dif = mGasto - lmGasto;
-    var pctD = ((dif / lmGasto) * 100).toFixed(0);
-    if (dif > 0) ins.push({ cls: 'amber', txt: 'Gastos aumentaram <strong>' + pctD + '%</strong> vs mes passado (' + formatValue(lmGasto) + ' > ' + formatValue(mGasto) + ').' });
-    else ins.push({ cls: 'green', txt: 'Gastos diminuram <strong>' + Math.abs(pctD) + '%</strong> vs mes passado (' + formatValue(lmGasto) + ' > ' + formatValue(mGasto) + ').' });
-  }
-  // 4. Economia
-  if (mGanho > 0) {
-    var ecoPct = ((mGanho - mGasto) / mGanho * 100).toFixed(0);
-    if (ecoPct < 0) ins.push({ cls: 'red', txt: 'Voce gastou <strong>mais do que ganhou</strong> este mes! Deficit de ' + formatValue(mGasto - mGanho) + '.' });
-    else if (ecoPct < 10) ins.push({ cls: 'amber', txt: 'Taxa de economia de apenas <strong>' + ecoPct + '%</strong>. Tente poupar pelo menos 20%.' });
-    else if (ecoPct >= 20) ins.push({ cls: 'green', txt: 'Voce esta economizando <strong>' + ecoPct + '%</strong> da renda. Excelente!' });
-  }
-  if (!ins.length) {
-    el.innerHTML = '<div class="ins-empty">Poucos dados. Continue adicionando transacoes.</div>';
-    return;
-  }
-  el.innerHTML = ins.map(function(x) {
-    return '<div class="ins-card ' + x.cls + '"><div class="ins-txt">' + x.txt + '</div></div>';
-  }).join('');
-}
-
-// ===== HOOK no loadData =====
-var _origLoad = loadData;
-loadData = async function() {
-  await _origLoad.apply(this, arguments);
-  try { await carregarCats(); window._bgtCache = await getBgt(); await procRecs(); } catch(e) {}
-};
-
-
-</script>
-</body>
-</html>
 
