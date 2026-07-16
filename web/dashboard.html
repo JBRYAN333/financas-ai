@@ -2826,6 +2826,25 @@ function getCats() {
   return CATS_DEFAULT;
 }
 
+function catEmojiFromName(name) {
+  var map = {
+    'alimentacao':'🍎','comida':'🍕','mercado':'🛒','feira':'🥬','restaurante':'🍽️',
+    'transporte':'🚗','uber':'🚗','combustivel':'⛽','gasolina':'⛽','metro':'🚇','onibus':'🚌',
+    'moradia':'🏠','aluguel':'🏡','condominio':'🏢','luz':'⚡','agua':'💧','energia':'⚡','gas':'🔥',
+    'saude':'💊','medico':'🩺','farmacia':'💊','hospital':'🏥','plano':'🩺','dentista':'🦷',
+    'assinaturas':'📦','spotify':'🎵','netflix':'🎬','streaming':'🎬','internet':'🌐','telefone':'📱',
+    'educacao':'📚','curso':'🎓','faculdade':'🎓','escola':'📖','livro':'📚',
+    'lazer':'🎮','cinema':'🎬','jogo':'🎮','viagem':'✈️','festa':'🎉','esporte':'🏋️',
+    'renda':'💰','salario':'💵','freela':'💼','investimento':'📈','bonus':'🎁','extra':'💸',
+    'outros':'📋'
+  };
+  var n = name.toLowerCase().trim();
+  for (var key in map) {
+    if (n === key || n.indexOf(key) >= 0) return map[key];
+  }
+  return '📋';
+}
+
 async function carregarCats() {
   if (!currentUser) return;
   try {
@@ -2833,7 +2852,7 @@ async function carregarCats() {
     if (doc.exists && doc.data().cats && Array.isArray(doc.data().cats) && doc.data().cats.length) {
       var raw = doc.data().cats;
       var cats = (typeof raw[0] === 'string')
-        ? raw.map(function(n) { return {name:n, emoji:'📋', type:'saida'}; })
+        ? raw.map(function(n) { return {name:n, emoji:catEmojiFromName(n), type:'saida'}; })
         : raw;
       window._cats = cats;
       currentUser.cats = cats;
@@ -2858,7 +2877,7 @@ function renderCats() {
     }
     var delBtn = isDef ? '' : ' <span class="cat-rm" onclick="rmCat(\'' + nm + '\')">\u2716</span>';
     var emBtn = ' <span class="cat-em-btn" onclick="openEmojiPicker(\'' + nm + '\')" title="Emoji">\uD83C\uDFF7</span>';
-    return '<span class="cat-chip">' + em + ' ' + nm + delBtn + emBtn + '</span>';
+    return '<span class="cat-chip" data-name="' + nm + '">' + em + ' ' + nm + emBtn + delBtn + '</span>';
   }).join('');
 }
 
@@ -2902,25 +2921,38 @@ async function rmCat(name) {
   fillRecCat();
 }
 
+var _emojiPickCb = null;
+
 function openEmojiPicker(catName) {
   var picker = document.getElementById('emojiPicker');
   if (!picker) return;
   picker.style.display = 'flex';
   var grid = document.getElementById('emojiGrid');
   if (!grid) return;
+  // Se for callback (new category), guarda; se for string, salva no data-cat
+  if (typeof catName === 'function') { _emojiPickCb = catName; }
+  else { _emojiPickCb = null; picker.setAttribute('data-cat', catName); }
   grid.innerHTML = EMOJI_BANK.map(function(e) {
-    return '<span class="ep-opt" onclick="selectEmoji(\'' + e + '\',\'' + catName + '\')">' + e + '</span>';
+    return '<span class="ep-opt" onclick="selectEmoji(\'' + e + '\')">' + e + '</span>';
   }).join('');
-  document.getElementById('epSearch').value = '';
   document.getElementById('epSearch').value = '';
 }
 
 function closeEmojiPicker() {
-  var picker = document.getElementById('emojiPicker');
-  if (picker) picker.style.display = 'none';
+  document.getElementById('emojiPicker').style.display = 'none';
+  _emojiPickCb = null;
 }
 
-function selectEmoji(emoji, catName) {
+function selectEmoji(emoji) {
+  if (_emojiPickCb) {
+    _emojiPickCb(emoji);
+    _emojiPickCb = null;
+    closeEmojiPicker();
+    return;
+  }
+  var picker = document.getElementById('emojiPicker');
+  var catName = picker.getAttribute('data-cat');
+  if (!catName) { closeEmojiPicker(); return; }
   var cats = getCats();
   for (var i = 0; i < cats.length; i++) {
     if ((cats[i].name || cats[i]) === catName) {
