@@ -7,7 +7,635 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js">
+
+        // ===== NAVEGAÇÃO ENTRE SEÇÕES =====
+        function switchSection(e, section) {
+            if (e) e.preventDefault();
+            // Esconde todas as seções
+            document.querySelectorAll('.dashboard-section').forEach(el => el.classList.remove('active'));
+            // Mostra a seção alvo
+            const target = document.getElementById('section-' + section);
+            if (target) target.classList.add('active');
+            // Atualiza sidebar
+            document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+            const link = document.querySelector(`.sidebar a[data-section="${section}"]`);
+            if (link) link.classList.add('active');
+            // Carrega dados da seção
+            if (section === 'categorias') renderCategories();
+            else if (section === 'orcamento') { populateBudgetCategorySelect(); renderBudgets(); }
+            else if (section === 'metas') renderGoals();
+            else if (section === 'recorrentes') { populateRecCategorySelect(); renderRecurring(); }
+            else if (section === 'insights') generateInsights();
+        }
+
+        // Mostra dashboard (seção padrão) no load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Dashboard é a seção padrão - já está visível
+        });
+
+        // ===== CATEGORIAS =====
+        const DEFAULT_CATEGORIES = ['Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Assinaturas', 'Educação', 'Lazer', 'Renda', 'Outros'];
+
+        function getUserCategories() {
+            const stored = window._userCategories;
+            if (stored && Array.isArray(stored) && stored.length) return stored;
+            return [...DEFAULT_CATEGORIES];
+        }
+
+        async function loadUserCategories() {
+            if (!currentUser) return;
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.categories && Array.isArray(data.categories) && data.categories.length) {
+                        window._userCategories = data.categories;
+                    } else {
+                        window._userCategories = [...DEFAULT_CATEGORIES];
+                        // Salva defaults no Firestore
+                        await db.collection('users').doc(currentUser.uid).set({ categories: DEFAULT_CATEGORIES }, { merge: true });
+                    }
+                } else {
+                    window._userCategories = [...DEFAULT_CATEGORIES];
+                }
+            } catch(e) {
+                console.log('loadUserCategories error:', e);
+                window._userCategories = [...DEFAULT_CATEGORIES];
+            }
+        }
+
+        function renderCategories() {
+            const cats = getUserCategories();
+            const list = document.getElementById('categoryList');
+            if (!list) return;
+            list.innerHTML = cats.map(c => {
+                const isDefault = DEFAULT_CATEGORIES.includes(c);
+                return `<span class="category-tag">${c}${isDefault ? '' : ' <span class="cat-remove" onclick="removeCategory(\'' + c + '\')">✕</span>'}</span>`;
+            }).join('');
+        }
+
+        async function addCategory() {
+            const input = document.getElementById('newCategoryName');
+            const name = input.value.trim();
+            if (!name) return;
+            const cats = getUserCategories();
+            if (cats.map(x => x.toLowerCase()).includes(name.toLowerCase())) {
+                document.getElementById('categoryStatus').textContent = '❌ Essa categoria já existe.';
+                return;
+            }
+            cats.push(name);
+            window._userCategories = cats;
+            await db.collection('users').doc(currentUser.uid).set({ categories: cats }, { merge: true });
+            input.value = '';
+            document.getElementById('categoryStatus').textContent = '✅ Categoria "' + name + '" adicionada!';
+            renderCategories();
+            populateBudgetCategorySelect();
+            populateRecCategorySelect();
+            setTimeout(() => document.getElementById('categoryStatus').textContent = '', 2000);
+        }
+
+        async function removeCategory(name) {
+            if (DEFAULT_CATEGORIES.includes(name)) return;
+            let cats = getUserCategories().filter(c => c !== name);
+            window._userCategories = cats;
+            await db.collection('users').doc(currentUser.uid).set({ categories: cats }, { merge: true });
+            renderCategories();
+            populateBudgetCategorySelect();
+            populateRecCategorySelect();
+        }
+
+        // ===== ORÇAMENTO =====
+        async function loadBudgets() {
+            if (!currentUser) return {};
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (doc.exists && doc.data().budgets) return doc.data().budgets;
+            } catch(e) {}
+            return {};
+        }
+
+        function populateBudgetCategorySelect() {
+            const sel = document.getElementById('budgetCategory');
+            if (!sel) return;
+            const cats = getUserCategories().filter(c => c !== 'Renda' && c !== 'Outros');
+            sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        async function setBudget() {
+            const cat = document.getElementById('budgetCategory').value;
+            const amount = parseFloat(document.getElementById('budgetAmount').value);
+            if (!cat || !amount || amount <= 0) {
+                document.getElementById('budgetStatus').textContent = '❌ Preencha categoria e valor válido.';
+                return;
+            }
+            let budgets = await loadBudgets();
+            budgets[cat] = amount;
+            await db.collection('users').doc(currentUser.uid).set({ budgets }, { merge: true });
+            document.getElementById('budgetAmount').value = '';
+            document.getElementById('budgetStatus').textContent = '✅ Orçamento de ' + formatValue(amount) + ' para "' + cat + '" salvo!';
+            renderBudgets();
+            setTimeout(() => document.getElementById('budgetStatus').textContent = '', 2000);
+        }
+
+        async function renderBudgets() {
+            const container = document.getElementById('budgetList');
+            if (!container) return;
+            const budgets = await loadBudgets();
+            const entries = Object.entries(budgets);
+            if (!entries.length) {
+                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Nenhum orçamento definido ainda. Crie um acima.</div>';
+                return;
+            }
+
+            // Calcula gasto real por categoria neste mês
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            let spentByCategory = {};
+            for (const t of allTransactions) {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                if (d >= monthStart && d <= monthEnd && t.type === 'saida') {
+                    const cat = t.category || 'Outros';
+                    const v = parseFloat(t.valueOriginal || t.value || 0);
+                    const c = t.currency || 'BRL';
+                    const converted = typeof convert === 'function' ? convert(v, c, userCurrency) : v;
+                    spentByCategory[cat] = (spentByCategory[cat] || 0) + converted;
+                }
+            }
+
+            container.innerHTML = entries.map(([cat, limit]) => {
+                const spent = spentByCategory[cat] || 0;
+                const pct = limit > 0 ? (spent / limit) * 100 : 0;
+                const barClass = pct >= 100 ? 'danger' : pct >= 75 ? 'warn' : 'safe';
+                const over = pct >= 100 ? ' <span style="color:var(--red)">⚠️ Estourou!</span>' : '';
+                return '<div class="budget-card">' +
+                    '<div class="budget-header">' +
+                        '<span class="budget-name">' + cat + '</span>' +
+                        '<span class="budget-spent' + (pct >= 100 ? ' over' : '') + '">' + formatValue(spent) + ' / ' + formatValue(limit) + over + '</span>' +
+                    '</div>' +
+                    '<div class="budget-bar"><div class="budget-bar-fill ' + barClass + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+                    '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem">' + pct.toFixed(0) + '% utilizado</div>' +
+                    '<div style="margin-top:0.5rem"><button onclick="removeBudget(\'' + cat + '\')" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:0.2rem 0.6rem;cursor:pointer;font-size:0.75rem">✕ Remover</button></div>' +
+                '</div>';
+            }).join('');
+        }
+
+        async function removeBudget(cat) {
+            let budgets = await loadBudgets();
+            delete budgets[cat];
+            await db.collection('users').doc(currentUser.uid).set({ budgets }, { merge: true });
+            renderBudgets();
+        }
+
+        // ===== METAS =====
+        async function loadGoals() {
+            if (!currentUser) return [];
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (doc.exists && doc.data().goals) return doc.data().goals;
+            } catch(e) {}
+            return [];
+        }
+
+        async function addGoal() {
+            const name = document.getElementById('goalName').value.trim();
+            const target = parseFloat(document.getElementById('goalTarget').value);
+            const deadline = document.getElementById('goalDeadline').value;
+            if (!name || !target || target <= 0) {
+                document.getElementById('goalStatus').textContent = '❌ Preencha nome e valor alvo.';
+                return;
+            }
+            const goals = await loadGoals();
+            goals.push({
+                id: 'goal_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                name: name,
+                target: target,
+                current: 0,
+                deadline: deadline || '',
+                createdAt: new Date().toISOString()
+            });
+            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
+            document.getElementById('goalName').value = '';
+            document.getElementById('goalTarget').value = '';
+            document.getElementById('goalDeadline').value = '';
+            document.getElementById('goalStatus').textContent = '✅ Meta "' + name + '" criada!';
+            renderGoals();
+            setTimeout(() => document.getElementById('goalStatus').textContent = '', 2000);
+        }
+
+        async function renderGoals() {
+            const container = document.getElementById('goalList');
+            if (!container) return;
+            const goals = await loadGoals();
+            if (!goals.length) {
+                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Nenhuma meta ainda. Crie sua primeira meta acima!</div>';
+                return;
+            }
+
+            container.innerHTML = goals.map(g => {
+                const pct = g.target > 0 ? (g.current / g.target) * 100 : 0;
+                const currentStr = formatValue(g.current);
+                const targetStr = formatValue(g.target);
+                const deadlineStr = g.deadline ? new Date(g.deadline).toLocaleDateString('pt-BR') : 'Sem prazo';
+                const remaining = g.target - g.current;
+                const remainingStr = remaining > 0 ? formatValue(remaining) : '🎉 Completou!';
+                return '<div class="goal-card" data-goal-id="' + g.id + '">' +
+                    '<div class="goal-header">' +
+                        '<div><div class="goal-name">' + g.name + '</div><div style="font-size:0.78rem;color:var(--text-dim)">Prazo: ' + deadlineStr + '</div></div>' +
+                        '<div style="text-align:right"><div style="font-weight:700">' + currentStr + '</div><div style="font-size:0.78rem;color:var(--text-dim)">de ' + targetStr + '</div></div>' +
+                    '</div>' +
+                    '<div class="goal-progress"><div class="goal-progress-bar" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+                    '<div class="goal-stats"><span>' + pct.toFixed(0) + '% concluído</span><span>Falta ' + remainingStr + '</span></div>' +
+                    '<div class="goal-actions">' +
+                        '<button class="goal-deposit" onclick="depositToGoal(\'' + g.id + '\')">💰 Depositar</button>' +
+                        '<button onclick="editGoal(\'' + g.id + '\')">✎ Editar</button>' +
+                        '<button onclick="deleteGoal(\'' + g.id + '\')" style="color:var(--red)">🗑 Excluir</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        async function depositToGoal(id) {
+            const goals = await loadGoals();
+            const g = goals.find(x => x.id === id);
+            if (!g) return;
+            const val = prompt('Quanto quer depositar na meta "' + g.name + '"? (atual: ' + formatValue(g.current) + ')');
+            if (val === null) return;
+            const amount = parseFloat(val);
+            if (isNaN(amount) || amount <= 0) return;
+            g.current = (g.current || 0) + amount;
+            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
+            renderGoals();
+        }
+
+        async function editGoal(id) {
+            const goals = await loadGoals();
+            const g = goals.find(x => x.id === id);
+            if (!g) return;
+            const newName = prompt('Nome da meta:', g.name);
+            if (newName === null) return;
+            const newTarget = parseFloat(prompt('Valor alvo:', g.target));
+            if (isNaN(newTarget) || newTarget <= 0) return;
+            const newCurrent = parseFloat(prompt('Valor atual:', g.current));
+            if (isNaN(newCurrent) || newCurrent < 0) return;
+            g.name = newName.trim();
+            g.target = newTarget;
+            g.current = newCurrent;
+            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
+            renderGoals();
+        }
+
+        async function deleteGoal(id) {
+            if (!confirm('Tem certeza que quer excluir esta meta?')) return;
+            let goals = await loadGoals();
+            goals = goals.filter(g => g.id !== id);
+            await db.collection('users').doc(currentUser.uid).set({ goals }, { merge: true });
+            renderGoals();
+        }
+
+        // ===== RECORRENTES =====
+        function populateRecCategorySelect() {
+            const sel = document.getElementById('recCategory');
+            if (!sel) return;
+            sel.innerHTML = getUserCategories().map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        async function loadRecurring() {
+            if (!currentUser) return [];
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (doc.exists && doc.data().recurring) return doc.data().recurring;
+            } catch(e) {}
+            return [];
+        }
+
+        async function addRecurring() {
+            const desc = document.getElementById('recDesc').value.trim();
+            const value = parseFloat(document.getElementById('recValue').value);
+            const type = document.getElementById('recType').value;
+            const category = document.getElementById('recCategory').value;
+            const frequency = document.getElementById('recFrequency').value;
+            const day = parseInt(document.getElementById('recDay').value) || 1;
+
+            if (!desc || !value || value <= 0) {
+                document.getElementById('recStatus').textContent = '❌ Preencha descrição e valor.';
+                return;
+            }
+
+            const rec = await loadRecurring();
+            // Calculate next date
+            const now = new Date();
+            let nextDate;
+            if (frequency === 'monthly') {
+                nextDate = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > day ? 1 : 0), day);
+            } else if (frequency === 'weekly') {
+                nextDate = new Date(now);
+                nextDate.setDate(now.getDate() + ((day - now.getDay() + 7) % 7 || 7));
+            } else if (frequency === 'yearly') {
+                nextDate = new Date(now.getFullYear(), day - 1, 1);
+                if (nextDate < now) nextDate = new Date(now.getFullYear() + 1, day - 1, 1);
+            } else {
+                nextDate = new Date(now);
+                nextDate.setDate(now.getDate() + 1);
+            }
+
+            rec.push({
+                id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                description: desc,
+                value: value,
+                type: type,
+                category: category,
+                frequency: frequency,
+                day: day,
+                nextDate: nextDate.toISOString().split('T')[0],
+                active: true,
+                createdAt: new Date().toISOString()
+            });
+
+            await db.collection('users').doc(currentUser.uid).set({ recurring: rec }, { merge: true });
+            document.getElementById('recDesc').value = '';
+            document.getElementById('recValue').value = '';
+            document.getElementById('recDay').value = '';
+            document.getElementById('recStatus').textContent = '✅ Recorrente "' + desc + '" adicionada!';
+            renderRecurring();
+            setTimeout(() => document.getElementById('recStatus').textContent = '', 2000);
+        }
+
+        async function renderRecurring() {
+            const container = document.getElementById('recurringList');
+            if (!container) return;
+            const recs = await loadRecurring();
+            if (!recs.length) {
+                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Nenhuma transação recorrente. Adicione contas fixas acima que serão criadas automaticamente.</div>';
+                return;
+            }
+
+            const freqLabels = { monthly: 'Mensal', weekly: 'Semanal', yearly: 'Anual', daily: 'Diário' };
+            container.innerHTML = recs.map(r => {
+                const typeIcon = r.type === 'entrada' ? '⬱' : '⬳';
+                const valueStr = formatValue(r.value);
+                const freq = freqLabels[r.frequency] || r.frequency;
+                const dayInfo = r.frequency === 'monthly' ? 'Dia ' + r.day : (r.frequency === 'weekly' ? 'Dia da sem. ' + r.day : '');
+                const activeClass = r.active ? 'active' : '';
+                return '<div class="recurring-item">' +
+                    '<div style="flex:1">' +
+                        '<div class="ri-name">' + typeIcon + ' ' + r.description + '</div>' +
+                        '<div class="ri-detail">' + r.category + ' • ' + freq + ' ' + dayInfo + ' • Próxima: ' + (r.nextDate ? new Date(r.nextDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—') + '</div>' +
+                    '</div>' +
+                    '<div class="ri-value">' + valueStr + '</div>' +
+                    '<div class="ri-actions" style="display:flex;align-items:center;gap:0.5rem;margin-left:1rem">' +
+                        '<button class="toggle-recurring ' + activeClass + '" onclick="toggleRecurring(\'' + r.id + '\')" title="Ativar/Desativar"></button>' +
+                        '<button onclick="deleteRecurring(\'' + r.id + '\')" title="Excluir">🗑</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        async function toggleRecurring(id) {
+            const recs = await loadRecurring();
+            const r = recs.find(x => x.id === id);
+            if (!r) return;
+            r.active = !r.active;
+            await db.collection('users').doc(currentUser.uid).set({ recurring: recs }, { merge: true });
+            renderRecurring();
+        }
+
+        async function deleteRecurring(id) {
+            if (!confirm('Excluir esta transação recorrente?')) return;
+            let recs = await loadRecurring();
+            recs = recs.filter(r => r.id !== id);
+            await db.collection('users').doc(currentUser.uid).set({ recurring: recs }, { merge: true });
+            renderRecurring();
+        }
+
+        // Auto-save recurring — rodada no load
+        async function processRecurring() {
+            // Puxa saldo geral
+            const recs = await loadRecurring();
+            if (!recs.length) return;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            let changed = false;
+
+            for (const r of recs) {
+                if (!r.active) continue;
+                if (!r.nextDate) continue;
+                const next = new Date(r.nextDate + 'T12:00:00');
+                next.setHours(0, 0, 0, 0);
+                if (next <= today) {
+                    // Cria transação automática
+                    const txRef = db.collection('users').doc(currentUser.uid).collection('transactions');
+                    await txRef.add({
+                        date: firebase.firestore.Timestamp.fromDate(next),
+                        description: '🔄 ' + r.description,
+                        value: r.value,
+                        type: r.type,
+                        category: r.category,
+                        bank: '',
+                        source: 'recurring',
+                        currency: userCurrency || 'BRL',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // Atualiza próxima data
+                    const nextDate = new Date(next);
+                    if (r.frequency === 'monthly') {
+                        nextDate.setMonth(nextDate.getMonth() + 1);
+                    } else if (r.frequency === 'weekly') {
+                        nextDate.setDate(nextDate.getDate() + 7);
+                    } else if (r.frequency === 'yearly') {
+                        nextDate.setFullYear(nextDate.getFullYear() + 1);
+                    } else {
+                        nextDate.setDate(nextDate.getDate() + 1);
+                    }
+                    r.nextDate = nextDate.toISOString().split('T')[0];
+                    changed = true;
+                }
+            }
+            if (changed) {
+                await db.collection('users').doc(currentUser.uid).set({ recurring: recs }, { merge: true });
+            }
+        }
+
+        // ===== INSIGHTS =====
+        function generateInsights() {
+            const container = document.getElementById('insightsList');
+            if (!container || !allTransactions || !allTransactions.length) {
+                if (container) container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Adicione transações para gerar insights.</div>';
+                return;
+            }
+
+            const insights = [];
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+            // Dados do mês atual
+            let monthSpent = 0, monthEarned = 0;
+            let categorySpent = {};
+            let bankSpent = {};
+            let dailySpent = {};
+
+            for (const t of allTransactions) {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                const v = parseFloat(t.valueOriginal || t.value || 0);
+                const c = t.currency || 'BRL';
+                const converted = typeof convert === 'function' ? convert(v, c, userCurrency) : v;
+
+                if (d >= monthStart && d <= monthEnd) {
+                    if (t.type === 'saida') {
+                        monthSpent += converted;
+                        const cat = t.category || 'Outros';
+                        categorySpent[cat] = (categorySpent[cat] || 0) + converted;
+                        const bank = t.bank || 'Outros';
+                        bankSpent[bank] = (bankSpent[bank] || 0) + converted;
+                        const dayKey = d.toISOString().split('T')[0];
+                        dailySpent[dayKey] = (dailySpent[dayKey] || 0) + converted;
+                    } else if (t.type === 'entrada') {
+                        monthEarned += converted;
+                    }
+                }
+            }
+
+            // 1. Maior gasto do mês
+            if (Object.keys(categorySpent).length) {
+                const topCat = Object.entries(categorySpent).sort((a, b) => b[1] - a[1])[0];
+                const pctOfTotal = monthSpent > 0 ? ((topCat[1] / monthSpent) * 100).toFixed(0) : 0;
+                insights.push({
+                    type: topCat[0] === 'Moradia' || topCat[0] === 'Saúde' ? 'warning' : 'info',
+                    icon: '📊',
+                    text: 'Seu maior gasto do mês foi em <strong>' + topCat[0] + '</strong>: ' + formatValue(topCat[1]) + ' (' + pctOfTotal + '% do total).',
+                    meta: 'Baseado em ' + allTransactions.length + ' transações'
+                });
+            }
+
+            // 2. Alerta de orçamento
+            const budgetsRaw = window._budgetsCache;
+            if (budgetsRaw && typeof budgetsRaw === 'object') {
+                for (const [cat, limit] of Object.entries(budgetsRaw)) {
+                    const spent = categorySpent[cat] || 0;
+                    if (limit > 0 && spent > limit) {
+                        insights.push({
+                            type: 'danger',
+                            icon: '⚠️',
+                            text: 'Você estourou o orçamento de <strong>' + cat + '</strong>! Gasto: ' + formatValue(spent) + ' de ' + formatValue(limit) + ' (' + ((spent / limit) * 100).toFixed(0) + '%).',
+                            meta: 'Considere reduzir gastos nessa categoria'
+                        });
+                    } else if (limit > 0 && spent > limit * 0.8) {
+                        insights.push({
+                            type: 'warning',
+                            icon: '⚡',
+                            text: 'Você já gastou ' + ((spent / limit) * 100).toFixed(0) + '% do orçamento de <strong>' + cat + '</strong> (' + formatValue(spent) + ' de ' + formatValue(limit) + ').',
+                            meta: 'Faltam ' + formatValue(limit - spent) + ' até o limite'
+                        });
+                    }
+                }
+            }
+
+            // 3. Comparativo com meses anteriores
+            const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+            let lastMonthSpent = 0;
+            for (const t of allTransactions) {
+                const d = t.date?.toDate ? t.date.toDate() : new Date(t.date || 0);
+                if (d >= lastMonthStart && d <= lastMonthEnd && t.type === 'saida') {
+                    const v = parseFloat(t.valueOriginal || t.value || 0);
+                    const c = t.currency || 'BRL';
+                    lastMonthSpent += typeof convert === 'function' ? convert(v, c, userCurrency) : v;
+                }
+            }
+            if (lastMonthSpent > 0) {
+                const diff = monthSpent - lastMonthSpent;
+                const pctDiff = ((diff / lastMonthSpent) * 100).toFixed(0);
+                if (diff > 0) {
+                    insights.push({
+                        type: 'warning',
+                        icon: '📈',
+                        text: 'Gastos aumentaram <strong>' + pctDiff + '%</strong> em relação ao mês passado (' + formatValue(lastMonthSpent) + ' → ' + formatValue(monthSpent) + ').',
+                        meta: 'Mês passado: ' + formatValue(lastMonthSpent)
+                    });
+                } else if (diff < 0) {
+                    insights.push({
+                        type: 'success',
+                        icon: '📉',
+                        text: 'Gastos diminuíram <strong>' + Math.abs(pctDiff) + '%</strong> em relação ao mês passado (' + formatValue(lastMonthSpent) + ' → ' + formatValue(monthSpent) + ').',
+                        meta: 'Mês passado: ' + formatValue(lastMonthSpent)
+                    });
+                }
+            }
+
+            // 4. Saldo vs receita
+            if (monthEarned > 0) {
+                const savePct = ((monthEarned - monthSpent) / monthEarned * 100).toFixed(0);
+                if (savePct < 0) {
+                    insights.push({
+                        type: 'danger',
+                        icon: '🔴',
+                        text: 'Você gastou <strong>mais do que ganhou</strong> este mês! Receita: ' + formatValue(monthEarned) + ', Gastos: ' + formatValue(monthSpent) + '.',
+                        meta: 'Déficit de ' + formatValue(monthSpent - monthEarned)
+                    });
+                } else if (savePct < 10) {
+                    insights.push({
+                        type: 'warning',
+                        icon: '💡',
+                        text: 'Sua taxa de economia é de apenas <strong>' + savePct + '%</strong>. Tente poupar pelo menos 20% da sua renda.',
+                        meta: 'Economizou ' + formatValue(monthEarned - monthSpent) + ' de ' + formatValue(monthEarned)
+                    });
+                } else if (savePct >= 20) {
+                    insights.push({
+                        type: 'success',
+                        icon: '🌟',
+                        text: 'Você está economizando <strong>' + savePct + '%</strong> da sua renda! Excelente ritmo.',
+                        meta: 'Economizou ' + formatValue(monthEarned - monthSpent) + ' de ' + formatValue(monthEarned)
+                    });
+                }
+            }
+
+            // 5. Padrões de gasto
+            const entries = Object.entries(dailySpent);
+            if (entries.length > 1) {
+                const values = entries.map(e => e[1]);
+                const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                if (monthSpent > 0 && avg > 0) {
+                    const projection = avg * (now.getDate());
+                    if (projection > 0 && monthSpent > 0) {
+                        insights.push({
+                            type: 'info',
+                            icon: '🔮',
+                            text: 'Projeção de gastos até fim do mês: <strong>' + formatValue(projection) + '</strong> (média de ' + formatValue(avg) + '/dia nos últimos dias).',
+                            meta: 'Gasto atual: ' + formatValue(monthSpent)
+                        });
+                    }
+                }
+            }
+
+            if (!insights.length) {
+                container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim)">Poucos dados ainda. Continue adicionando transações para receber insights!</div>';
+                return;
+            }
+
+            container.innerHTML = insights.map(ins => {
+                const colors = { info: '#3b82f6', warning: '#f59e0b', danger: '#ef4444', success: '#10b981' };
+                return '<div class="insight-card insight-' + ins.type + '" style="border-left-color:' + (colors[ins.type] || '#3b82f6') + '">' +
+                    '<div class="insight-text">' + ins.icon + ' ' + ins.text + '</div>' +
+                    '<div class="insight-meta">' + ins.meta + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        // ===== HOOKS — integrar com o fluxo existente =====
+        // Sobrescreve loadData para carregar categorias e processar recorrentes
+        const _originalLoadData = loadData;
+        loadData = async function() {
+            await _originalLoadData.apply(this, arguments);
+            try {
+                await loadUserCategories();
+                window._budgetsCache = await loadBudgets();
+                await processRecurring();
+            } catch(e) { console.log('Extra load error:', e); }
+        };
+
+</script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -567,6 +1195,103 @@
             #filterPeriod, #filterBank { width: 100%; }
             #dateFrom, #dateTo { width: 45%; }
         }
+    
+        /* ===== NOVAS FEATURES ===== */
+        .section { display: none; }
+        .section.active { display: block; }
+        .dashboard-section { display: none; }
+        .dashboard-section.active { display: block; }
+        
+        /* Sidebar links de navegação */
+        .sidebar .nav-section { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; padding: 1rem 0 0.3rem; margin-top: 0.5rem; border-top: 1px solid var(--border); }
+        
+        /* Cards de meta */
+        .goal-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem 1.5rem; margin-bottom: 1rem; transition: all var(--transition); }
+        .goal-card:hover { box-shadow: var(--shadow-md); }
+        .goal-card .goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.7rem; }
+        .goal-card .goal-name { font-weight: 700; font-size: 1rem; }
+        .goal-card .goal-progress { margin: 0.5rem 0; background: var(--border); border-radius: 20px; height: 8px; overflow: hidden; }
+        .goal-card .goal-progress-bar { height: 100%; border-radius: 20px; background: var(--gradient-brand); transition: width 0.5s ease; }
+        .goal-card .goal-stats { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); }
+        .goal-card .goal-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+        .goal-card .goal-actions button { padding: 0.3rem 0.8rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+        .goal-card .goal-actions button:hover { background: var(--card-hover); }
+        .goal-card .goal-actions .goal-deposit { background: var(--green); color: #052e16; border: none; font-weight: 600; }
+        
+        /* Orçamento */
+        .budget-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem 1.5rem; margin-bottom: 0.8rem; transition: all var(--transition); }
+        .budget-card:hover { box-shadow: var(--shadow-sm); }
+        .budget-card .budget-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+        .budget-card .budget-name { font-weight: 600; font-size: 0.9rem; }
+        .budget-card .budget-spent { font-size: 0.85rem; }
+        .budget-card .budget-spent.over { color: var(--red); font-weight: 600; }
+        .budget-card .budget-bar { height: 6px; background: var(--border); border-radius: 10px; overflow: hidden; margin-top: 0.3rem; }
+        .budget-card .budget-bar-fill { height: 100%; border-radius: 10px; transition: width 0.4s ease; }
+        .budget-card .budget-bar-fill.safe { background: var(--green); }
+        .budget-card .budget-bar-fill.warn { background: var(--amber); }
+        .budget-card .budget-bar-fill.danger { background: var(--red); }
+        
+        /* Recorrentes */
+        .recurring-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.8rem 1.2rem; margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center; transition: all var(--transition-fast); }
+        .recurring-item:hover { border-color: var(--text-dim); }
+        .recurring-item .ri-name { font-weight: 500; }
+        .recurring-item .ri-detail { font-size: 0.78rem; color: var(--text-dim); }
+        .recurring-item .ri-value { font-weight: 600; white-space: nowrap; }
+        .recurring-item .ri-actions button { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.25rem; font-size: 0.9rem; }
+        .recurring-item .ri-actions button:hover { color: var(--red); }
+        .recurring-item .toggle-recurring { width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer; position: relative; background: var(--border); transition: background var(--transition-fast); }
+        .recurring-item .toggle-recurring.active { background: var(--green); }
+        .recurring-item .toggle-recurring::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--transition-fast); }
+        .recurring-item .toggle-recurring.active::after { transform: translateX(16px); }
+        
+        /* Modal novo + melhorias edit modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; }
+        .modal-box label { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 0.3rem; margin-top: 0.8rem; }
+        .modal-box input, .modal-box select { width: 100%; padding: 0.6rem 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.85rem; margin-bottom: 0.2rem; }
+        .modal-box input:focus, .modal-box select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+        .modal-box .modal-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .modal-box .modal-actions { display: flex; gap: 0.7rem; margin-top: 1.2rem; }
+        .modal-box .modal-actions button { flex: 1; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: inherit; font-size: 0.9rem; }
+        .modal-box .modal-actions .btn-primary { background: var(--green); color: #052e16; border: none; }
+        .modal-box .modal-actions .btn-primary:hover { filter: brightness(1.1); }
+        .modal-box .modal-actions .btn-cancel { background: var(--card); border: 1px solid var(--border); color: var(--text-dim); }
+        .modal-box .modal-actions .btn-cancel:hover { color: var(--text); }
+        
+        /* Insights */
+        .insight-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem 1.5rem; margin-bottom: 0.8rem; border-left: 4px solid; transition: all var(--transition-fast); }
+        .insight-card:hover { box-shadow: var(--shadow-sm); }
+        .insight-card.insight-info { border-left-color: var(--blue); }
+        .insight-card.insight-warning { border-left-color: var(--amber); }
+        .insight-card.insight-danger { border-left-color: var(--red); }
+        .insight-card.insight-success { border-left-color: var(--green); }
+        .insight-card .insight-icon { font-size: 1.2rem; margin-right: 0.5rem; }
+        .insight-card .insight-text { font-size: 0.9rem; line-height: 1.5; }
+        .insight-card .insight-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem; }
+        
+        /* Tags de categoria editáveis */
+        .category-tag { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(16,185,129,0.1); color: var(--green); padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.8rem; margin: 0.2rem; cursor: pointer; transition: all var(--transition-fast); }
+        .category-tag:hover { transform: scale(1.03); }
+        .category-tag .cat-remove { cursor: pointer; opacity: 0.6; font-size: 0.7rem; }
+        .category-tag .cat-remove:hover { opacity: 1; color: var(--red); }
+        .category-grid { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 1rem 0; }
+        
+        /* Badge de insight */
+        .insight-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: 500; }
+        .insight-badge.bg-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+        .insight-badge.bg-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+        .insight-badge.bg-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .insight-badge.bg-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        
+        /* Responsivo mobile */
+        @media (max-width: 768px) {
+            .goal-card { padding: 1rem; }
+            .budget-card { padding: 0.8rem 1rem; }
+            .recurring-item { flex-wrap: wrap; gap: 0.5rem; }
+            .modal-box { padding: 1.2rem; margin: 0.5rem; }
+            .insight-card { padding: 1rem; }
+        }
+
     </style>
 </head>
 <body>
@@ -585,8 +1310,16 @@
                     <div style="font-size:0.7rem;color:var(--text-dim)">inteligente</div>
                 </div>
             </div>
-            <a href="#" class="active" style="gap:0"><span>Dashboard</span></a>
-            <a href="index.html" style="gap:0"><span>Início</span></a>
+            <a href="#" class="active" onclick="switchSection(event, 'dashboard')" data-section="dashboard">📊 Dashboard</a>
+            <div class="nav-section">Financeiro</div>
+            <a href="#" onclick="switchSection(event, 'dashboard')" data-section="dashboard">📊 Dashboard</a>
+            <a href="#" onclick="switchSection(event, 'categorias')" data-section="categorias">🏷️ Categorias</a>
+            <a href="#" onclick="switchSection(event, 'orcamento')" data-section="orcamento">💰 Orçamento</a>
+            <a href="#" onclick="switchSection(event, 'metas')" data-section="metas">🎯 Metas</a>
+            <a href="#" onclick="switchSection(event, 'recorrentes')" data-section="recorrentes">🔄 Recorrentes</a>
+            <a href="#" onclick="switchSection(event, 'insights')" data-section="insights">💡 Insights</a>
+            <div class="nav-section">Links</div>
+            <a href="index.html" style="gap:0"><span>📄 Início</span></a>
             <div class="banks-toggle" id="banksToggle" onclick="toggleBanks()">
                 <span class="arrow" id="banksArrow">▶</span>
                 <span>Bancos <span id="bankCount" style="font-size:0.65rem;color:var(--text-dim)">(0)</span></span>
@@ -733,6 +1466,109 @@
                             <tbody id="previewBody"></tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+
+            <!-- ===== SEÇÃO CATEGORIAS ===== -->
+            <div class="section dashboard-section" id="section-categorias">
+                <div class="dashboard-header">
+                    <h1>🏷️ Categorias</h1>
+                    <p class="subtitle">Gerencie suas categorias de gasto</p>
+                </div>
+                <div class="add-card">
+                    <h3>➕ Nova categoria</h3>
+                    <div style="display:flex;gap:0.5rem">
+                        <input type="text" id="newCategoryName" placeholder="Nome da categoria" style="flex:1;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <button onclick="addCategory()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Adicionar</button>
+                    </div>
+                    <div id="categoryStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                </div>
+                <div class="add-card">
+                    <h3>Suas categorias</h3>
+                    <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:0.5rem">Clique no ✕ para remover. As categorias padrão não podem ser removidas.</p>
+                    <div class="category-grid" id="categoryList"></div>
+                    <div style="margin-top:0.5rem;font-size:0.78rem;color:var(--text-muted)">
+                        <strong>Padrão:</strong> Alimentação, Transporte, Moradia, Saúde, Assinaturas, Educação, Lazer, Renda, Outros
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== SEÇÃO ORÇAMENTO ===== -->
+            <div class="section dashboard-section" id="section-orcamento">
+                <div class="dashboard-header">
+                    <h1>💰 Orçamento mensal</h1>
+                    <p class="subtitle">Defina limites de gasto por categoria</p>
+                </div>
+                <div class="add-card">
+                    <h3>Definir orçamento</h3>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <select id="budgetCategory" style="flex:1;min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
+                        <input type="number" id="budgetAmount" step="0.01" placeholder="Limite mensal" style="flex:0.5;min-width:120px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <button onclick="setBudget()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Salvar</button>
+                    </div>
+                    <div id="budgetStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                </div>
+                <div id="budgetList"></div>
+            </div>
+
+            <!-- ===== SEÇÃO METAS ===== -->
+            <div class="section dashboard-section" id="section-metas">
+                <div class="dashboard-header">
+                    <h1>🎯 Metas financeiras</h1>
+                    <p class="subtitle">Acompanhe seus objetivos de economia</p>
+                </div>
+                <div class="add-card">
+                    <h3>➕ Nova meta</h3>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <input type="text" id="goalName" placeholder="Ex: Reserva de emergência" style="flex:1;min-width:160px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <input type="number" id="goalTarget" step="0.01" placeholder="Valor alvo" style="flex:0.4;min-width:100px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <input type="date" id="goalDeadline" style="flex:0.4;min-width:130px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <button onclick="addGoal()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Criar</button>
+                    </div>
+                    <div id="goalStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                </div>
+                <div id="goalList"></div>
+            </div>
+
+            <!-- ===== SEÇÃO RECORRENTES ===== -->
+            <div class="section dashboard-section" id="section-recorrentes">
+                <div class="dashboard-header">
+                    <h1>🔄 Transações recorrentes</h1>
+                    <p class="subtitle">Automatize contas fixas — aluguel, assinaturas, salário</p>
+                </div>
+                <div class="add-card">
+                    <h3>➕ Nova recorrente</h3>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <input type="text" id="recDesc" placeholder="Ex: Aluguel" style="flex:1;min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <input type="number" id="recValue" step="0.01" placeholder="Valor" style="flex:0.3;min-width:90px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <select id="recType" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                            <option value="saida">Saída</option>
+                            <option value="entrada">Entrada</option>
+                        </select>
+                        <select id="recCategory" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
+                        <select id="recFrequency" style="padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                            <option value="monthly">Mensal</option>
+                            <option value="weekly">Semanal</option>
+                            <option value="yearly">Anual</option>
+                            <option value="daily">Diário</option>
+                        </select>
+                        <input type="number" id="recDay" min="1" max="31" placeholder="Dia" style="width:60px;padding:0.7rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
+                        <button onclick="addRecurring()" style="background:var(--green);color:#052e16;border:none;border-radius:8px;padding:0.7rem 1.5rem;font-weight:600;cursor:pointer">Adicionar</button>
+                    </div>
+                    <div id="recStatus" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-dim)"></div>
+                </div>
+                <div id="recurringList"></div>
+            </div>
+
+            <!-- ===== SEÇÃO INSIGHTS ===== -->
+            <div class="section dashboard-section" id="section-insights">
+                <div class="dashboard-header">
+                    <h1>💡 Insights</h1>
+                    <p class="subtitle">Análises inteligentes baseadas nos seus dados</p>
+                </div>
+                <div id="insightsList">
+                    <div class="loading"><div class="loading-spinner"></div><span>Analisando seus dados...</span></div>
                 </div>
             </div>
 
