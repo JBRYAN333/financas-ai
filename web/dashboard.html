@@ -2101,6 +2101,8 @@
                         transferId: transferId,
                         source: 'manual'
                     });
+                    // Discord notification for transfer
+                    if (allTransactions.length > 0) sendDiscordNotification(allTransactions[0]);
                 } else {
                     const transaction = {
                         date: new Date(),
@@ -2135,6 +2137,7 @@
                 status.textContent = 'Adicionado! (' + moedaOrigem + ')';
                 setTimeout(() => { status.textContent = ''; }, 3000);
                 // Atualiza UI com dados em memória (loadData pode falhar com ad blocker)
+                if (tipo !== 'transferencia' && allTransactions.length > 0) sendDiscordNotification(allTransactions[0]);
                 try { await loadData(); } catch(e) { console.log('loadData fallback'); }
                 updateDashboard();
                 updateTable();
@@ -2145,6 +2148,52 @@
             }
         });
 
+
+        
+        async function sendDiscordNotification(transaction) {
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).get();
+                if (!doc.exists) return;
+                const d = doc.data();
+                const url = d.webhookUrl || '';
+                if (!url || !url.includes('discord.com/api/webhooks/')) return;
+                if (!d.notifications?.discord) return;
+                const dt = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date || Date.now());
+                const dateStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+                const typeIcon = transaction.type === 'entrada' ? '⬱' : (transaction.type === 'transferencia' ? '⇄' : '⬳');
+                const typeLabel = transaction.type === 'entrada' ? 'Entrada' : (transaction.type === 'transferencia' ? 'Transferência' : 'Saída');
+                const valor = transaction.value || 0;
+                const cur = transaction.currency || 'BRL';
+                const valorStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: cur }).format(valor);
+                const desc = transaction.description || 'Sem descrição';
+                const cat = transaction.category || 'Outros';
+                const bank = transaction.bank || '';
+                const embed = {
+                    title: typeIcon + ' ' + typeLabel + ' — ' + valorStr,
+                    description: desc,
+                    color: transaction.type === 'entrada' ? 0x10b981 : (transaction.type === 'transferencia' ? 0x3b82f6 : 0xef4444),
+                    fields: [
+                        { name: 'Categoria', value: cat, inline: true },
+                        { name: 'Valor', value: valorStr, inline: true },
+                        { name: 'Data', value: dateStr, inline: true }
+                    ],
+                    footer: { text: 'FAI — Finanças Inteligentes' },
+                    timestamp: new Date().toISOString()
+                };
+                if (bank) embed.fields.push({ name: 'Banco', value: bank, inline: true });
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'FAI - Finanças',
+                        avatar_url: 'https://jbryan333.github.io/financas-ai/web/favicon.svg',
+                        embeds: [embed]
+                    })
+                });
+            } catch(e) {
+                console.log('Discord notification failed:', e);
+            }
+        }
 
         function handleLogout() {
             auth.signOut();
@@ -2203,14 +2252,23 @@
                     <option value="JPY">JPY - Iene (¥)</option>
                 </select>
                 
-                <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Notificações</label>
+                <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Notificações — Discord</label>
                 <div style="margin-bottom:1.5rem">
-                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;padding:0.3rem 0">
-                        <input type="checkbox" id="notifTelegram" style="accent-color:var(--green)"> Telegram
+                    <label style="display:block;font-size:0.85rem;color:var(--text-dim);margin-bottom:0.3rem">URL do Webhook do Discord</label>
+                    <input type="url" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." style="width:100%;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.82rem;margin-bottom:0.5rem">
+                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;padding:0.3rem 0">
+                        <input type="checkbox" id="notifDiscord" style="accent-color:var(--green)"> Notificar no Discord quando adicionar transação
                     </label>
-                    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;padding:0.3rem 0">
-                        <input type="checkbox" id="notifDiscord" style="accent-color:var(--green)"> Discord
-                    </label>
+                    <details style="font-size:0.75rem;color:var(--text-dim);margin-top:0.3rem">
+                        <summary style="cursor:pointer">Como criar um webhook?</summary>
+                        <ol style="padding-left:1.2rem;margin-top:0.3rem;line-height:1.6">
+                            <li>Abra o Discord > Servidor > Canal de texto</li>
+                            <li>Config. do Canal > Integrações > Webhooks</li>
+                            <li>Clique em "Novo Webhook", copie a URL</li>
+                            <li>Cole a URL acima e salve</li>
+                        </ol>
+                        <p style="margin-top:0.3rem;color:var(--text-dim)">Zero permissões de admin necessárias.</p>
+                    </details>
                 </div>
                 
                 <label style="display:block;margin-bottom:0.5rem;color:var(--text-dim);font-size:0.85rem">Dados (LGPD)</label>
@@ -2238,8 +2296,8 @@
                 if (doc.exists) {
                     const data = doc.data();
                     if (data.currency) document.getElementById('userCurrency').value = data.currency;
-                    if (data.notifications?.telegram) document.getElementById('notifTelegram').checked = true;
                     if (data.notifications?.discord) document.getElementById('notifDiscord').checked = true;
+                    if (data.webhookUrl) document.getElementById('webhookUrl').value = data.webhookUrl;
                 }
             } catch(e) { console.log('Settings:', e); }
         }
@@ -2247,11 +2305,12 @@
         async function saveSettings() {
             if (!currentUser) return;
             const currency = document.getElementById('userCurrency').value;
-            const telegram = document.getElementById('notifTelegram').checked;
+            const webhookUrl = document.getElementById('webhookUrl').value.trim();
             const discord = document.getElementById('notifDiscord').checked;
             await db.collection('users').doc(currentUser.uid).set({
                 currency: currency,
-                notifications: { telegram, discord }
+                webhookUrl: webhookUrl || '',
+                notifications: { discord }
             }, { merge: true });
             document.getElementById('settingsModal').remove();
             alert('Configurações salvas!');
