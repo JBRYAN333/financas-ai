@@ -1373,11 +1373,13 @@
                 const bankLabel = t.bank || '—';
                 const typeIcon = t.type === 'entrada' ? '+' : (t.type === 'transferencia' ? '⇄' : '-');
                 const typeClass = t.type === 'entrada' ? 'positive' : (t.type === 'transferencia' ? '' : 'negative');
-                function highlight(text) {
+                                function highlight(text) {
                     if (!searchTerm.trim()) return text || '—';
-                    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\]/g, '\\$&');
-                    const parts = (text || '—').toString().split(new RegExp('(' + escaped + ')', 'gi'));
-                    return parts.map(p => p.toLowerCase() === searchTerm.trim().toLowerCase() ? '<mark style="background:rgba(16,185,129,0.25);color:var(--text);border-radius:2px;padding:0.1rem 0">' + p + '</mark>' : p).join('');
+                    const n = searchTerm.trim().toLowerCase();
+                    const s = (text || '—').toString();
+                    const i = s.toLowerCase().indexOf(n);
+                    if (i === -1) return s;
+                    return s.slice(0,i) + '<mark style="background:rgba(16,185,129,0.25);color:var(--text);border-radius:2px;padding:0.1rem 0">' + s.slice(i,i+n.length) + '</mark>' + s.slice(i+n.length);
                 }
                 tr.innerHTML = `
                     <td>${highlight(d.toLocaleDateString('pt-BR'))}</td>
