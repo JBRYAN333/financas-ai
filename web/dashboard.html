@@ -2940,8 +2940,9 @@ function openIconPicker(catName) {
   // Se for callback (new category), guarda; se for string, salva no data-cat
   if (typeof catName === 'function') { _iconPickCb = catName; }
   else { _iconPickCb = null; picker.setAttribute('data-cat', catName); }
-  grid.innerHTML = EMOJI_BANK.map(function(e) {
-    return '<span class="ep-opt" onclick="selectIcon(\'' + e + '\')">' + e + '</span>';
+  grid.innerHTML = ICON_KEYS.map(function(k) {
+    var svg = ICON_SVG[k] || ICON_SVG['more'];
+    return '<span class="ip-opt" onclick="selectIcon(\'' + k + '\')" title="' + k + '">' + svg + '</span>';
   }).join('');
   document.getElementById('icSearch').value = '';
 }
