@@ -106,6 +106,11 @@
             --sidebar-active: rgba(5,150,105,0.12);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+        ::selection { background: var(--green); color: #fff; }
         body {
             font-family: 'Inter', -apple-system, sans-serif;
             background: var(--bg);
@@ -144,11 +149,16 @@
             font-size: 0.9rem;
             transition: all var(--transition-fast);
         }
-        .sidebar a:hover, .sidebar a.active { 
-            background: rgba(34,197,94,0.1); 
+
+        .sidebar a.active { 
+            border-left: 3px solid var(--green); 
+            background: var(--sidebar-active);
             color: var(--text);
         }
-        .sidebar a.active { border-left: 3px solid var(--green); }
+        .sidebar a:hover { 
+            background: var(--sidebar-hover); 
+            color: var(--text);
+        }
         .sidebar .user-info {
             margin-top: auto;
             padding-top: 1rem;
@@ -178,6 +188,48 @@
             font-size: 0.8rem;
         }
         .sidebar .logout-btn:hover { background: rgba(239,68,68,0.1); }
+        .sidebar .theme-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0.75rem;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-top: 0.4rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .sidebar .theme-toggle:hover {
+            background: var(--sidebar-hover);
+            color: var(--text);
+        }
+        .sidebar .theme-toggle .toggle-track {
+            width: 36px;
+            height: 20px;
+            background: var(--border);
+            border-radius: 10px;
+            position: relative;
+            transition: background var(--transition);
+        }
+        .sidebar .theme-toggle .toggle-track::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: var(--text);
+            border-radius: 50%;
+            transition: transform var(--transition), background var(--transition);
+        }
+        [data-theme="light"] .sidebar .theme-toggle .toggle-track { background: var(--green); }
+        [data-theme="light"] .sidebar .theme-toggle .toggle-track::after {
+            transform: translateX(16px);
+            background: #fff;
+        }
 
         .main {
             flex: 1;
@@ -199,7 +251,19 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             padding: 1.2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition);
+            cursor: default;
         }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        .stat-card.accent-green { border-top: 3px solid var(--green); }
+        .stat-card.accent-blue { border-top: 3px solid var(--blue); }
+        .stat-card.accent-red { border-top: 3px solid var(--red); }
+        .stat-card.accent-amber { border-top: 3px solid var(--amber); }
         .stat-card .label { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.3rem; }
         .stat-card .value { font-size: 1.5rem; font-weight: 700; }
         .stat-card .value.positive { color: var(--green); }
@@ -218,7 +282,9 @@
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             padding: 1.2rem;
+            transition: all var(--transition);
         }
+        .chart-card:hover { box-shadow: var(--shadow-md); }
         .chart-card h3 { margin-bottom: 1rem; font-size: 0.95rem; }
         .chart-card canvas { max-height: 300px; }
 
@@ -229,7 +295,9 @@
             border-radius: var(--radius-md);
             padding: 1.2rem;
             margin-bottom: 2rem;
+            transition: all var(--transition);
         }
+        .add-card:hover { box-shadow: var(--shadow-md); }
         .add-card h3 { margin-bottom: 1rem; }
         .add-form {
             display: flex;
@@ -452,7 +520,11 @@
             <div class="user-info">
                 <div style="color:var(--text);font-weight:500" id="userName">—</div>
                 <div class="email" id="userEmail">—</div>
-                <button class="logout-btn" style="border-color:var(--blue);color:var(--blue);margin-top:0.2rem" onclick="showSettings()">Config</button>
+                <div class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeLabel">🌙 Escuro</span>
+                    <div class="toggle-track"></div>
+                </div>
+                <button class="logout-btn" style="border-color:var(--blue);color:var(--blue);margin-top:0.2rem" onclick="showSettings()">⚙️ Config</button>
                 <button class="logout-btn" onclick="handleLogout()">Sair</button>
             </div>
         </div>
@@ -1935,6 +2007,23 @@
             auth.signOut();
             window.location.href = 'index.html';
         }
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'light' ? '' : 'light';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            document.getElementById('themeLabel').textContent = next === 'light' ? '☀️ Claro' : '🌙 Escuro';
+            setTimeout(() => { if (typeof updateCharts === 'function') updateCharts(); }, 100);
+        }
+        function applySavedTheme() {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.getElementById('themeLabel').textContent = '☀️ Claro';
+            }
+        }
+        setTimeout(applySavedTheme, 0);
 
         // Settings modal
         function showSettings() {
