@@ -424,11 +424,14 @@
         .edit-btn {
             background: none;
             border: none;
-            color: var(--blue);
+            color: var(--text-dim);
             cursor: pointer;
-            font-size: 0.8rem;
             opacity: 0.5;
+            padding: 0.2rem;
+            line-height: 1;
+            transition: opacity 0.15s;
         }
+        .edit-btn:hover { opacity: 1; }
         .edit-btn:hover { opacity: 1; }
 
         /* Edit modal */
@@ -864,7 +867,33 @@
             </div>
 
 
-            </div><!-- end pag-dashboard -->
+            </div><div class="table-card">
+                <h3>📋 Últimas transações <span id="transCount"></span></h3>
+                <div id="transactionsLoading" class="loading"><div class="loading-spinner"></div><span>Carregando...</span></div>
+                <div id="transactionsTableContainer" style="display:none">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem">
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px">
+                            <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor..." oninput="applySearch()" style="padding:0.45rem 0.8rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;flex:1;min-width:140px;transition:all var(--transition-fast)">
+                            <span id="searchClear" onclick="clearSearch()" style="display:none;cursor:pointer;font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0.5rem;white-space:nowrap">✕ Limpar</span>
+                        </div>
+                        <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
+                        <div style="display:flex;gap:0.5rem">
+                            <button onclick="exportCSV()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">📥 CSV</button>
+                            <button onclick="prevPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="prevBtn">◀</button>
+                            <button onclick="nextPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="nextBtn">▶</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead><tr>
+                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th style="width:60px"></th>
+                        </tr></thead>
+                        <tbody id="transactionsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+            <!-- end pag-dashboard -->
             <div class="section-page" id="pag-categorias">
               <div class="dashboard-header">
                 <h1>Categorias</h1>
@@ -958,32 +987,7 @@
               </div>
             </div>
 
-            <div class="table-card">
-                <h3>📋 Últimas transações <span id="transCount"></span></h3>
-                <div id="transactionsLoading" class="loading"><div class="loading-spinner"></div><span>Carregando...</span></div>
-                <div id="transactionsTableContainer" style="display:none">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem">
-                        <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px">
-                            <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor..." oninput="applySearch()" style="padding:0.45rem 0.8rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;flex:1;min-width:140px;transition:all var(--transition-fast)">
-                            <span id="searchClear" onclick="clearSearch()" style="display:none;cursor:pointer;font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0.5rem;white-space:nowrap">✕ Limpar</span>
-                        </div>
-                        <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
-                        <div style="display:flex;gap:0.5rem">
-                            <button onclick="exportCSV()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">📥 CSV</button>
-                            <button onclick="prevPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="prevBtn">◀</button>
-                            <button onclick="nextPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="nextBtn">▶</button>
-                        </div>
-                    </div>
-                    <table>
-                        <thead><tr>
-                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th style="width:60px"></th>
-                        </tr></thead>
-                        <tbody id="transactionsBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
+            
 
     <script>
         // Firebase Config
