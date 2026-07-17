@@ -424,14 +424,11 @@
         .edit-btn {
             background: none;
             border: none;
-            color: var(--text-dim);
+            color: var(--blue);
             cursor: pointer;
+            font-size: 0.8rem;
             opacity: 0.5;
-            padding: 0.2rem;
-            line-height: 1;
-            transition: opacity 0.15s;
         }
-        .edit-btn:hover { opacity: 1; }
         .edit-btn:hover { opacity: 1; }
 
         /* Edit modal */
@@ -867,33 +864,7 @@
             </div>
 
 
-            </div><div class="table-card">
-                <h3>📋 Últimas transações <span id="transCount"></span></h3>
-                <div id="transactionsLoading" class="loading"><div class="loading-spinner"></div><span>Carregando...</span></div>
-                <div id="transactionsTableContainer" style="display:none">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem">
-                        <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px">
-                            <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor..." oninput="applySearch()" style="padding:0.45rem 0.8rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;flex:1;min-width:140px;transition:all var(--transition-fast)">
-                            <span id="searchClear" onclick="clearSearch()" style="display:none;cursor:pointer;font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0.5rem;white-space:nowrap">✕ Limpar</span>
-                        </div>
-                        <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
-                        <div style="display:flex;gap:0.5rem">
-                            <button onclick="exportCSV()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">📥 CSV</button>
-                            <button onclick="prevPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="prevBtn">◀</button>
-                            <button onclick="nextPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="nextBtn">▶</button>
-                        </div>
-                    </div>
-                    <table>
-                        <thead><tr>
-                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th style="width:60px"></th>
-                        </tr></thead>
-                        <tbody id="transactionsBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-            <!-- end pag-dashboard -->
+            </div><!-- end pag-dashboard -->
             <div class="section-page" id="pag-categorias">
               <div class="dashboard-header">
                 <h1>Categorias</h1>
@@ -987,7 +958,32 @@
               </div>
             </div>
 
-            
+            <div class="table-card">
+                <h3>📋 Últimas transações <span id="transCount"></span></h3>
+                <div id="transactionsLoading" class="loading"><div class="loading-spinner"></div><span>Carregando...</span></div>
+                <div id="transactionsTableContainer" style="display:none">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem">
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex:1;min-width:200px">
+                            <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, data, valor..." oninput="applySearch()" style="padding:0.45rem 0.8rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:0.82rem;flex:1;min-width:140px;transition:all var(--transition-fast)">
+                            <span id="searchClear" onclick="clearSearch()" style="display:none;cursor:pointer;font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0.5rem;white-space:nowrap">✕ Limpar</span>
+                        </div>
+                        <span id="pageInfo" style="font-size:0.85rem;color:var(--text-dim)"></span>
+                        <div style="display:flex;gap:0.5rem">
+                            <button onclick="exportCSV()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">📥 CSV</button>
+                            <button onclick="prevPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="prevBtn">◀</button>
+                            <button onclick="nextPage()" class="btn-secondary" style="padding:0.3rem 0.7rem;font-size:0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer" id="nextBtn">▶</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead><tr>
+                            <th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Banco</th><th style="width:60px"></th>
+                        </tr></thead>
+                        <tbody id="transactionsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Firebase Config
@@ -2769,6 +2765,9 @@ function switchPage(page) {
   document.querySelectorAll('.section-page').forEach(function(el) { el.classList.remove('active'); });
   var target = document.getElementById('pag-' + page);
   if (target) target.classList.add('active');
+  // Soh mostra tabela de transacoes no Dashboard
+  var tc = document.querySelector('.table-card');
+  if (tc) tc.style.display = (page === 'dashboard') ? '' : 'none';
   document.querySelectorAll('#sidebar a').forEach(function(a) { a.classList.remove('active'); });
   var link = document.querySelector('#sidebar a[data-page="' + page + '"]');
   if (link) link.classList.add('active');
@@ -2820,23 +2819,26 @@ var ICON_KEYS = ['coffee', 'navigation', 'home', 'heart', 'package', 'book', 'ga
 
 
 function getCats() {
-  var c = window._cats;
-  if (c && Array.isArray(c) && c.length && typeof c[0] === 'object') return c;
-  if (c && Array.isArray(c) && c.length) {
-    // Convert old string cats to objects
-    c = c.map(function(n) { return {name:n, icon:'more', type:'saida'}; });
-    window._cats = c;
-    return c;
-  }
-  // Try from currentUser
-  if (currentUser && currentUser.cats && currentUser.cats.length) {
+  var c = window.__catsCache;
+  if (c && Array.isArray(c) && c.length) return c;
+  if (currentUser && currentUser.cats && Array.isArray(currentUser.cats) && currentUser.cats.length) {
     c = currentUser.cats;
     if (typeof c[0] === 'string') {
-      c = c.map(function(n) { return {name:n, icon:'more', type:'saida'}; });
+      c = c.map(function(n) { return {name:n, icon:catIconFromName(n), type:'saida'}; });
+      currentUser.cats = c;
     }
-    window._cats = c;
+    window.__catsCache = c;
     return c;
   }
+  if (window._cats && Array.isArray(window._cats) && window._cats.length) {
+    var tmp = window._cats;
+    if (typeof tmp[0] === 'string') {
+      tmp = tmp.map(function(n) { return {name:n, icon:catIconFromName(n), type:'saida'}; });
+    }
+    window.__catsCache = tmp;
+    return tmp;
+  }
+  window.__catsCache = CATS_DEFAULT;
   return CATS_DEFAULT;
 }
 
@@ -2868,14 +2870,17 @@ async function carregarCats() {
       var cats = (typeof raw[0] === 'string')
         ? raw.map(function(n) { return {name:n, icon:catIconFromName(n), type:'saida'}; })
         : raw;
-      window._cats = cats;
+      for (var i = 0; i < cats.length; i++) {
+        if (!cats[i].icon) cats[i].icon = catIconFromName(cats[i].name || cats[i]);
+      }
+      window.__catsCache = cats;
       currentUser.cats = cats;
     } else {
-      window._cats = CATS_DEFAULT;
+      window.__catsCache = CATS_DEFAULT;
       currentUser.cats = CATS_DEFAULT;
       await db.collection('users').doc(currentUser.uid).set({ cats: CATS_DEFAULT }, { merge: true });
     }
-  } catch(e) { window._cats = CATS_DEFAULT; }
+  } catch(e) { window.__catsCache = CATS_DEFAULT; }
 }
 
 function renderCats() {
@@ -2912,7 +2917,7 @@ async function addCat() {
   }
   openIconPicker(function(icon) {
     cats.push({name:name, icon:icon, type:'saida'});
-    window._cats = cats;
+    window.__catsCache = cats;
     currentUser.cats = cats;
     db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true }).then(function() {
       input.value = '';
@@ -2931,7 +2936,7 @@ async function rmCat(name) {
   }
   if (isDef) return;
   var cats = getCats().filter(function(c) { return (c.name || c) !== name; });
-  window._cats = cats;
+  window.__catsCache = cats;
   currentUser.cats = cats;
   await db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
   renderCats();
@@ -2979,7 +2984,7 @@ function selectIcon(icon) {
       break;
     }
   }
-  window._cats = cats;
+  window.__catsCache = cats;
   currentUser.cats = cats;
   db.collection('users').doc(currentUser.uid).set({ cats: cats }, { merge: true });
   renderCats();
