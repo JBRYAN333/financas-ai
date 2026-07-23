@@ -649,10 +649,10 @@
 .rec-item .rec-acts { display: flex; align-items: center; gap: 0.5rem; margin-left: 0.8rem; }
 .rec-item .rec-acts button { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 0.2rem; font-size: 0.85rem; }
 .rec-item .rec-acts button:hover { color: var(--red); }
-.rec-tgl { width: 34px; height: 18px; border-radius: 9px; border: none; cursor: pointer; position: relative; background: var(--border); transition: background var(--transition-fast); }
-.rec-tgl.on { background: var(--green); }
-.rec-tgl::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform var(--transition-fast); }
-.rec-tgl.on::after { transform: translateX(16px); }
+.rec-tgl { width: 40px; height: 22px; border-radius: 11px; border: none; cursor: pointer; position: relative; background: var(--red); transition: background var(--transition-fast); box-shadow: 0 0 0 1px rgba(239,68,68,0.3); }
+.rec-tgl.on { background: var(--green); box-shadow: 0 0 0 1px rgba(16,185,129,0.3); }
+.rec-tgl::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--transition-fast); }
+.rec-tgl.on::after { transform: translateX(18px); }
 
 /* Insight */
 .ins-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem 1.5rem; margin-bottom: 0.7rem; border-left: 4px solid; }
@@ -707,7 +707,7 @@
             </div>
             <a href="#" class="active" style="gap:0" data-page="dashboard">Dashboard</a>            <div class="nav-divider">Gestão</div>
             <a href="#" data-page="categorias">Categorias</a>
-            <a href="#" data-page="orcamento">Orcamento</a>
+            <a href="#" data-page="orcamento">Orçamento</a>
             <a href="#" data-page="metas">Metas</a>
             <a href="#" data-page="recorrentes">Recorrentes</a>
             <a href="#" data-page="insights">Insights</a>
@@ -887,11 +887,11 @@
 
             <div class="section-page" id="pag-orcamento">
               <div class="dashboard-header">
-                <h1>Orcamento mensal</h1>
+                <h1>Orçamento mensal</h1>
                 <p class="subtitle">Defina limites por categoria</p>
               </div>
               <div class="add-card">
-                <h3>Definir orcamento</h3>
+                <h3>Definir orçamento</h3>
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
                   <select id="bgtCat" style="flex:1;min-width:140px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem"></select>
                   <input type="number" id="bgtVal" step="0.01" placeholder="Limite mensal" style="flex:0.5;min-width:100px;padding:0.7rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.9rem">
@@ -922,8 +922,8 @@
 
             <div class="section-page" id="pag-recorrentes">
               <div class="dashboard-header">
-                <h1>Transacoes recorrentes</h1>
-                <p class="subtitle">Contas fixas — aluguel, assinaturas, salario</p>
+                <h1>Transações recorrentes</h1>
+                <p class="subtitle">Contas fixas — aluguel, assinaturas, salário</p>
               </div>
               <div class="add-card">
                 <h3>Nova recorrente</h3>
@@ -951,7 +951,7 @@
             <div class="section-page" id="pag-insights">
               <div class="dashboard-header">
                 <h1>Insights</h1>
-                <p class="subtitle">Analises inteligentes dos seus dados</p>
+                <p class="subtitle">Análises inteligentes dos seus dados</p>
               </div>
               <div id="insList">
                 <div class="loading"><div class="loading-spinner"></div><span>Analisando...</span></div>
@@ -2392,6 +2392,38 @@
 
 
         
+        async function testWebhook() {
+            const url = document.getElementById('webhookUrl').value.trim();
+            const statusEl = document.getElementById('webhookTestStatus');
+            if (!url || !url.includes('discord.com/api/webhooks/')) {
+                statusEl.textContent = '⚠ Cole a URL do webhook primeiro';
+                statusEl.style.color = 'var(--red)';
+                return;
+            }
+            statusEl.textContent = '⏳ Enviando...';
+            statusEl.style.color = 'var(--text-dim)';
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'FAI — Teste',
+                        content: '🔔 **Webhook funcionando!** Conexão com o FAI estabelecida com sucesso.'
+                    })
+                });
+                if (res.ok || res.status === 204) {
+                    statusEl.textContent = '✅ Teste enviado!';
+                    statusEl.style.color = 'var(--green)';
+                } else {
+                    statusEl.textContent = '❌ Erro ' + res.status + ': ' + (await res.text()).slice(0, 50);
+                    statusEl.style.color = 'var(--red)';
+                }
+            } catch(e) {
+                statusEl.textContent = '❌ Falha: ' + e.message;
+                statusEl.style.color = 'var(--red)';
+            }
+        }
+
         async function sendDiscordNotification(transaction, options = {}) {
             try {
                 const doc = await db.collection('users').doc(currentUser.uid).get();
@@ -2559,6 +2591,8 @@
                     <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;padding:0.3rem 0">
                         <input type="checkbox" id="notifDiscord" style="accent-color:var(--green)"> Notificar no Discord quando adicionar transação
                     </label>
+                    <button onclick="testWebhook()" style="margin-top:0.3rem;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.7rem;border-radius:6px;cursor:pointer;font-family:inherit;font-size:0.78rem">🔔 Testar webhook</button>
+                    <span id="webhookTestStatus" style="font-size:0.78rem;margin-left:0.5rem;color:var(--text-dim)"></span>
                     <details style="font-size:0.75rem;color:var(--text-dim);margin-top:0.3rem">
                         <summary style="cursor:pointer">Como criar um webhook?</summary>
                         <ol style="padding-left:1.2rem;margin-top:0.3rem;line-height:1.6">
@@ -2799,12 +2833,12 @@ function switchPage(page) {
 
 // ===== CATEGORIAS =====
 var CATS_DEFAULT = [
-  {name:'Alimentacao', icon:'food', type:'saida'},
+  {name:'Alimentação', icon:'food', type:'saida'},
   {name:'Transporte', icon:'car', type:'saida'},
   {name:'Moradia', icon:'home', type:'saida'},
-  {name:'Saude', icon:'heart', type:'saida'},
+  {name:'Saúde', icon:'heart', type:'saida'},
   {name:'Assinaturas', icon:'box', type:'saida'},
-  {name:'Educacao', icon:'book', type:'saida'},
+  {name:'Educação', icon:'book', type:'saida'},
   {name:'Lazer', icon:'game', type:'saida'},
   {name:'Renda', icon:'dollar', type:'entrada'},
   {name:'Outros', icon:'more', type:'saida'}
@@ -2844,12 +2878,12 @@ function getCats() {
 
 function catIconFromName(name) {
   var map = {
-    'alimentacao':'food','comida':'food','mercado':'bag','feira':'bag','restaurante':'food',
+    'alimentacao':'food','alimentação':'food','comida':'food','mercado':'bag','feira':'bag','restaurante':'food',
     'transporte':'car','uber':'car','combustivel':'zap','gasolina':'zap','metro':'car','onibus':'car',
     'moradia':'home','aluguel':'home','condominio':'home','luz':'zap','agua':'water','energia':'zap','gas':'zap',
-    'saude':'heart','medico':'heart','farmacia':'heart','hospital':'heart','plano':'heart','dentista':'heart',
+    'saude':'heart','saúde':'heart','medico':'heart','farmacia':'heart','hospital':'heart','plano':'heart','dentista':'heart',
     'assinaturas':'box','spotify':'music','netflix':'film','streaming':'film','internet':'wifi','telefone':'phone',
-    'educacao':'book','curso':'book','faculdade':'book','escola':'book','livro':'book',
+    'educacao':'book','educação':'book','curso':'book','faculdade':'book','escola':'book','livro':'book',
     'lazer':'game','cinema':'film','jogo':'game','viagem':'map','festa':'gift','esporte':'star',
     'renda':'dollar','salario':'dollar','freela':'briefcase','investimento':'trend','bonus':'gift','extra':'dollar',
     'outros':'more'
@@ -2870,7 +2904,11 @@ async function carregarCats() {
       var cats = (typeof raw[0] === 'string')
         ? raw.map(function(n) { return {name:n, icon:catIconFromName(n), type:'saida'}; })
         : raw;
+      // Migra nomes antigos (sem acento) pra versão acentuada
+      var legacyMap = {'Alimentacao':'Alimentação','Saude':'Saúde','Educacao':'Educação'};
       for (var i = 0; i < cats.length; i++) {
+        var nm = cats[i].name || cats[i];
+        if (legacyMap[nm]) cats[i].name = legacyMap[nm];
         if (!cats[i].icon) cats[i].icon = catIconFromName(cats[i].name || cats[i]);
       }
       window.__catsCache = cats;
@@ -3000,12 +3038,28 @@ function filterIconPicker() {
   }
 }
 
-// ===== ORCAMENTO =====
+// ===== ORÇAMENTO =====
 async function getBgt() {
   if (!currentUser) return {};
   try {
     var doc = await db.collection('users').doc(currentUser.uid).get();
-    if (doc.exists && doc.data().bgt) return doc.data().bgt;
+    if (doc.exists && doc.data().bgt) {
+      // Migra chaves antigas sem acento para versão acentuada
+      var bgt = doc.data().bgt;
+      var legacyMap = {'Alimentacao':'Alimentação','Saude':'Saúde','Educacao':'Educação'};
+      var salvou = false;
+      for (var oldKey in legacyMap) {
+        if (bgt.hasOwnProperty(oldKey)) {
+          bgt[legacyMap[oldKey]] = bgt[oldKey];
+          delete bgt[oldKey];
+          salvou = true;
+        }
+      }
+      if (salvou) {
+        await db.collection('users').doc(currentUser.uid).set({ bgt: bgt }, { merge: true });
+      }
+      return bgt;
+    }
   } catch(e) {}
   return {};
 }
@@ -3034,7 +3088,7 @@ async function setBgt() {
   await db.collection('users').doc(currentUser.uid).set({ bgt: bgt }, { merge: true });
   window._bgtCache = bgt;
   document.getElementById('bgtVal').value = '';
-  document.getElementById('bgtStatus').textContent = 'Orcamento salvo.';
+  document.getElementById('bgtStatus').textContent = 'Orçamento salvo.';
   renderBgt();
 }
 
@@ -3044,7 +3098,7 @@ async function renderBgt() {
   var bgt = await getBgt();
   var entries = Object.keys(bgt);
   if (!entries.length) {
-    el.innerHTML = '<div class="ins-empty">Nenhum orcamento definido.</div>';
+    el.innerHTML = '<div class="ins-empty">Nenhum orçamento definido.</div>';
     return;
   }
   window._bgtCache = bgt;
@@ -3233,7 +3287,7 @@ async function renderRecs() {
   }
   el.innerHTML = recs.map(function(r) {
     var ic = r.tipo === 'entrada' ? 'E' : 'S';
-    return '<div class="rec-item"><div style="flex:1"><div class="rec-name">' + ic + ' ' + r.desc + '</div><div class="rec-detail">' + r.cat + ' / ' + freqLabel(r.freq) + (r.freq === 'monthly' ? ' dia ' + r.dia : '') + ' / Prox: ' + (r.next ? new Date(r.next + 'T12:00:00').toLocaleDateString('pt-BR') : '-') + '</div></div><div class="rec-val">' + formatValue(r.val) + '</div><div class="rec-acts"><button class="rec-tgl' + (r.ativo ? ' on' : '') + '" onclick="tglRec(\'' + r.id + '\')" title="Ativar/Desativar"></button><button onclick="delRec(\'' + r.id + '\')" title="Excluir" style="color:var(--red)">x</button></div></div>';
+    return '<div class="rec-item"><div style="flex:1"><div class="rec-name">' + ic + ' ' + r.desc + '</div><div class="rec-detail">' + r.cat + ' / ' + freqLabel(r.freq) + (r.freq === 'monthly' ? ' dia ' + r.dia : '') + ' / Prox: ' + (r.next ? new Date(r.next + 'T12:00:00').toLocaleDateString('pt-BR') : '-') + '</div></div><div class="rec-val">' + formatValue(r.val) + '</div><div class="rec-acts"><button class="rec-tgl' + (r.ativo ? ' on' : '') + '" onclick="tglRec(\'' + r.id + '\')" title="Ativar/Desativar"></button><button onclick="delRec(\'' + r.id + '\')" title="Excluir" style="color:var(--red);background:none;border:none;cursor:pointer;padding:0.2rem;display:inline-flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>';
   }).join('');
 }
 
@@ -3310,13 +3364,13 @@ function gerarInsights() {
     var pctT = mGasto > 0 ? ((catVal[top] / mGasto) * 100).toFixed(0) : 0;
     ins.push({ cls: 'blue', txt: 'Maior gasto do mes: <strong>' + top + '</strong> - ' + formatValue(catVal[top]) + ' (' + pctT + '% do total).' });
   }
-  // 2. Orcamento
+  // 2. Orçamento
   if (window._bgtCache) {
     for (var c in window._bgtCache) {
       var lim = window._bgtCache[c];
       var gast = catVal[c] || 0;
-      if (lim > 0 && gast > lim) ins.push({ cls: 'red', txt: 'Orcamento de <strong>' + c + '</strong> estourado! Gasto: ' + formatValue(gast) + ' de ' + formatValue(lim) + '.' });
-      else if (lim > 0 && gast > lim * 0.8) ins.push({ cls: 'amber', txt: 'Voce gastou ' + ((gast/lim)*100).toFixed(0) + '% do orcamento de <strong>' + c + '</strong> (' + formatValue(gast) + ' de ' + formatValue(lim) + ').' });
+      if (lim > 0 && gast > lim) ins.push({ cls: 'red', txt: 'Orçamento de <strong>' + c + '</strong> estourado! Gasto: ' + formatValue(gast) + ' de ' + formatValue(lim) + '.' });
+      else if (lim > 0 && gast > lim * 0.8) ins.push({ cls: 'amber', txt: 'Você gastou ' + ((gast/lim)*100).toFixed(0) + '% do orçamento de <strong>' + c + '</strong> (' + formatValue(gast) + ' de ' + formatValue(lim) + ').' });
     }
   }
   // 3. Comparativo mes anterior
@@ -3342,9 +3396,9 @@ function gerarInsights() {
   // 4. Economia
   if (mGanho > 0) {
     var ecoPct = ((mGanho - mGasto) / mGanho * 100).toFixed(0);
-    if (ecoPct < 0) ins.push({ cls: 'red', txt: 'Voce gastou <strong>mais do que ganhou</strong> este mes! Deficit de ' + formatValue(mGasto - mGanho) + '.' });
+    if (ecoPct < 0) ins.push({ cls: 'red', txt: 'Você gastou <strong>mais do que ganhou</strong> este mês! Déficit de ' + formatValue(mGasto - mGanho) + '.' });
     else if (ecoPct < 10) ins.push({ cls: 'amber', txt: 'Taxa de economia de apenas <strong>' + ecoPct + '%</strong>. Tente poupar pelo menos 20%.' });
-    else if (ecoPct >= 20) ins.push({ cls: 'green', txt: 'Voce esta economizando <strong>' + ecoPct + '%</strong> da renda. Excelente!' });
+    else if (ecoPct >= 20) ins.push({ cls: 'green', txt: 'Você está economizando <strong>' + ecoPct + '%</strong> da renda. Excelente!' });
   }
   if (!ins.length) {
     el.innerHTML = '<div class="ins-empty">Poucos dados. Continue adicionando transacoes.</div>';
